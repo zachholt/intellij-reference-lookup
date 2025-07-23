@@ -14,8 +14,9 @@ import java.util.regex.Pattern;
 
 public class JavaConstantParser {
     // Pattern to match public static final constants with their values
+    // Updated to handle Integer, Long, etc. object types and valueOf() calls
     private static final Pattern CONSTANT_PATTERN = Pattern.compile(
-        "public\\s+static\\s+final\\s+(?:String|int|long|double|float|boolean|char|byte|short)\\s+(\\w+)\\s*=\\s*(.+?);"
+        "public\\s+static\\s+final\\s+(?:String|Integer|Long|Double|Float|Boolean|Character|Byte|Short|int|long|double|float|boolean|char|byte|short)\\s+(\\w+)\\s*=\\s*(.+?);"
     );
     
     // Pattern to match JavaDoc comments
@@ -51,9 +52,17 @@ public class JavaConstantParser {
                 String constantName = constantMatcher.group(1);
                 String constantValue = constantMatcher.group(2).trim();
                 
-                // Clean up the value (remove quotes for strings)
+                // Clean up the value
                 if (constantValue.startsWith("\"") && constantValue.endsWith("\"")) {
+                    // String value - remove quotes
                     constantValue = constantValue.substring(1, constantValue.length() - 1);
+                } else if (constantValue.contains(".valueOf(")) {
+                    // Extract value from Integer.valueOf(123) -> "123"
+                    int start = constantValue.indexOf('(');
+                    int end = constantValue.lastIndexOf(')');
+                    if (start != -1 && end != -1 && start < end) {
+                        constantValue = constantValue.substring(start + 1, end).trim();
+                    }
                 }
                 
                 // Look for associated comments

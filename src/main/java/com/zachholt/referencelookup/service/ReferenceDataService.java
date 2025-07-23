@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project;
 import com.zachholt.referencelookup.model.ReferenceItem;
 import com.zachholt.referencelookup.parser.JavaConstantParser;
 
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
@@ -35,14 +36,17 @@ public final class ReferenceDataService {
             // 1. Java file in user's home directory
             Path userJavaPath = Paths.get(System.getProperty("user.home"), ".reference-lookup", "Reference.java");
             if (Files.exists(userJavaPath)) {
+                LOG.info("Loading references from: " + userJavaPath);
                 loadFromJavaFile(userJavaPath);
             } else {
+                LOG.info("No Reference.java found at: " + userJavaPath);
                 // 2. JSON file in user's home directory
                 Path userJsonPath = Paths.get(System.getProperty("user.home"), ".reference-lookup", "references.json");
                 if (Files.exists(userJsonPath)) {
                     loadFromJsonFile(userJsonPath);
                 } else {
                     // 3. Load from resources as fallback
+                    LOG.info("Loading default references from resources");
                     loadFromResources();
                 }
             }
@@ -57,8 +61,11 @@ public final class ReferenceDataService {
     private void loadFromJavaFile(Path path) throws Exception {
         JavaConstantParser parser = new JavaConstantParser();
         List<ReferenceItem> loaded = parser.parseJavaFile(path);
-        if (loaded != null) {
+        if (loaded != null && !loaded.isEmpty()) {
             references.addAll(loaded);
+            LOG.info("Successfully parsed " + loaded.size() + " items from Java file");
+        } else {
+            LOG.warn("No constants found in Java file or parsing failed");
         }
     }
 
@@ -74,15 +81,19 @@ public final class ReferenceDataService {
     }
 
     private void loadFromResources() throws Exception {
-        try (InputStreamReader reader = new InputStreamReader(
-                getClass().getResourceAsStream("/references.json"))) {
-            if (reader != null) {
-                Gson gson = new Gson();
-                Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
-                List<ReferenceItem> loaded = gson.fromJson(reader, listType);
-                if (loaded != null) {
-                    references.addAll(loaded);
-                }
+        InputStream resourceStream = getClass().getResourceAsStream("/references.json");
+        if (resourceStream == null) {
+            LOG.error("Could not find references.json in resources");
+            return;
+        }
+        
+        try (InputStreamReader reader = new InputStreamReader(resourceStream)) {
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
+            List<ReferenceItem> loaded = gson.fromJson(reader, listType);
+            if (loaded != null && !loaded.isEmpty()) {
+                references.addAll(loaded);
+                LOG.info("Loaded " + loaded.size() + " default references from resources");
             }
         }
     }
