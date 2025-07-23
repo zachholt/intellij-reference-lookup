@@ -52,11 +52,7 @@ public class QuickLookupAction extends ActionGroup {
         
         List<AnAction> actions = new ArrayList<>();
         
-        // Add the original search action
-        actions.add(new LookupAction());
-        actions.add(Separator.getInstance());
-        
-        // Search for matches
+        // Search for matches first
         ReferenceDataService service = ReferenceDataService.getInstance(project);
         List<ReferenceItem> matches = service.search(selectedText.trim());
         
@@ -70,7 +66,7 @@ public class QuickLookupAction extends ActionGroup {
             
             if (matches.size() > 10) {
                 actions.add(Separator.getInstance());
-                actions.add(new AnAction("... and " + (matches.size() - 10) + " more") {
+                actions.add(new AnAction("... and " + (matches.size() - 10) + " more (Click to search all)") {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
                         // Open the full search popup
@@ -78,6 +74,15 @@ public class QuickLookupAction extends ActionGroup {
                     }
                 });
             }
+            
+            // Always add search option at the end
+            actions.add(Separator.getInstance());
+            actions.add(new AnAction("Search All References...") {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e) {
+                    new LookupAction().actionPerformed(e);
+                }
+            });
         } else {
             actions.add(new AnAction("No matches found") {
                 @Override
@@ -88,6 +93,15 @@ public class QuickLookupAction extends ActionGroup {
                 @Override
                 public void update(@NotNull AnActionEvent e) {
                     e.getPresentation().setEnabled(false);
+                }
+            });
+            
+            // Still add search option
+            actions.add(Separator.getInstance());
+            actions.add(new AnAction("Search All References...") {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e) {
+                    new LookupAction().actionPerformed(e);
                 }
             });
         }
@@ -103,18 +117,9 @@ public class QuickLookupAction extends ActionGroup {
             this.item = item;
             
             // Set tooltip to show full description
-            String tooltip = "<html><b>" + escapeHtml(item.getCode()) + "</b><br/>" + 
-                           escapeHtml(item.getDescription() != null ? item.getDescription() : "No description") + 
-                           "</html>";
+            String tooltip = item.getCode() + "\n" + 
+                           (item.getDescription() != null ? item.getDescription() : "No description");
             getTemplatePresentation().setDescription(tooltip);
-        }
-        
-        private static String escapeHtml(String text) {
-            return text.replace("&", "&amp;")
-                      .replace("<", "&lt;")
-                      .replace(">", "&gt;")
-                      .replace("\"", "&quot;")
-                      .replace("'", "&#39;");
         }
         
         private static String formatMenuItem(ReferenceItem item) {
@@ -123,9 +128,9 @@ public class QuickLookupAction extends ActionGroup {
                 desc = "No description";
             }
             
-            // For very long descriptions, we can use HTML to format better
-            // IntelliJ supports HTML in menu items
-            return "<html><b>" + escapeHtml(item.getCode()) + "</b> → " + escapeHtml(desc) + "</html>";
+            // IntelliJ doesn't support HTML in menu items, just return plain text
+            // The menu will auto-wrap very long text
+            return item.getCode() + " → " + desc;
         }
         
         @Override
