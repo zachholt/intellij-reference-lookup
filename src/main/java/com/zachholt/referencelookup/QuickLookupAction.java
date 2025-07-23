@@ -101,14 +101,31 @@ public class QuickLookupAction extends ActionGroup {
         QuickValueAction(ReferenceItem item) {
             super(formatMenuItem(item));
             this.item = item;
+            
+            // Set tooltip to show full description
+            String tooltip = "<html><b>" + escapeHtml(item.getCode()) + "</b><br/>" + 
+                           escapeHtml(item.getDescription() != null ? item.getDescription() : "No description") + 
+                           "</html>";
+            getTemplatePresentation().setDescription(tooltip);
+        }
+        
+        private static String escapeHtml(String text) {
+            return text.replace("&", "&amp;")
+                      .replace("<", "&lt;")
+                      .replace(">", "&gt;")
+                      .replace("\"", "&quot;")
+                      .replace("'", "&#39;");
         }
         
         private static String formatMenuItem(ReferenceItem item) {
             String desc = item.getDescription();
-            if (desc != null && desc.length() > 60) {
-                desc = desc.substring(0, 57) + "...";
+            if (desc == null) {
+                desc = "No description";
             }
-            return item.getCode() + " → " + (desc != null ? desc : "No description");
+            
+            // For very long descriptions, we can use HTML to format better
+            // IntelliJ supports HTML in menu items
+            return "<html><b>" + escapeHtml(item.getCode()) + "</b> → " + escapeHtml(desc) + "</html>";
         }
         
         @Override
