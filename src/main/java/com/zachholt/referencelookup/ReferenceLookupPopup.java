@@ -52,7 +52,7 @@ public class ReferenceLookupPopup {
         // Perform initial search
         performSearch(initialQuery);
         searchField.setText(initialQuery);
-        searchField.selectAll();
+        searchField.getTextEditor().selectAll();
     }
 
     private JPanel createMainPanel() {
@@ -61,7 +61,7 @@ public class ReferenceLookupPopup {
 
         // Search field
         searchField = new SearchTextField();
-        searchField.setColumns(40);
+        searchField.getTextEditor().setColumns(40);
         searchField.getTextEditor().getDocument().addDocumentListener(new DocumentAdapter() {
             @Override
             protected void textChanged(DocumentEvent e) {
