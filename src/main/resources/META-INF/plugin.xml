@@ -19,11 +19,20 @@
     </extensions>
 
     <actions>
+        <!-- Quick lookup action group that shows values in submenu -->
+        <group id="com.zachholt.referencelookup.QuickLookupGroup"
+               class="com.zachholt.referencelookup.QuickLookupAction"
+               text="Reference Lookup"
+               description="Look up the selected text in the reference database"
+               popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu1.FindRefactor"/>
+        </group>
+        
+        <!-- Keep the keyboard shortcut for direct search -->
         <action id="com.zachholt.referencelookup.LookupAction"
                 class="com.zachholt.referencelookup.LookupAction"
-                text="Lookup Reference"
-                description="Look up the selected text in the reference database">
-            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu1.FindRefactor"/>
+                text="Search All References..."
+                description="Open the reference search dialog">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift L"/>
         </action>
     </actions>
