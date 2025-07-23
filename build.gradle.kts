@@ -4,7 +4,9 @@ plugins {
 }
 
 group = "com.zachholt"
-version = "1.0.0"
+version = System.getenv("GITHUB_REF")?.let { 
+    if (it.startsWith("refs/tags/v")) it.substring(11) else "1.0.0"
+} ?: "1.0.0"
 
 repositories {
     mavenCentral()
