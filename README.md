@@ -1,10 +1,10 @@
 # Reference Lookup IntelliJ Plugin
 
 [![Build](https://github.com/zachholt/intellij-reference-lookup/workflows/Build/badge.svg)](https://github.com/zachholt/intellij-reference-lookup/actions)
-[![Version](https://img.shields.io/jetbrains/plugin/v/PLUGIN_ID.svg)](https://plugins.jetbrains.com/plugin/PLUGIN_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/PLUGIN_ID.svg)](https://plugins.jetbrains.com/plugin/PLUGIN_ID)
 
 A fast and easy-to-use reference lookup tool for IntelliJ IDEA that allows you to quickly search through reference codes and their descriptions. Perfect for developers working with large codebases containing thousands of constants, error codes, or reference values.
+
+This plugin is designed for internal team use and supports direct parsing of Java constant files.
 
 ## Features
 
@@ -14,19 +14,33 @@ A fast and easy-to-use reference lookup tool for IntelliJ IDEA that allows you t
 - **Smart Search**: Supports partial matches and fuzzy search
 - **Copy to Clipboard**: Double-click or press Enter to copy the code
 
-## Installation
+## Team Installation
 
-1. Build the plugin:
+### Option 1: Install from ZIP file (Recommended)
+
+1. Download the latest plugin ZIP from the [Releases](https://github.com/zachholt/intellij-reference-lookup/releases) page
+   
+2. Install in IntelliJ IDEA:
+   - Go to Settings → Plugins → ⚙️ → Install Plugin from Disk
+   - Select the downloaded ZIP file
+   - Restart IntelliJ IDEA
+
+### Option 2: Build from source
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/zachholt/intellij-reference-lookup.git
+   cd intellij-reference-lookup
+   ```
+
+2. Build the plugin:
    ```bash
    ./gradlew buildPlugin
    ```
 
-2. The plugin JAR will be created in `build/distributions/`
+3. The plugin ZIP will be created in `build/distributions/`
 
-3. Install in IntelliJ IDEA:
-   - Go to Settings → Plugins → ⚙️ → Install Plugin from Disk
-   - Select the JAR file
-   - Restart IntelliJ IDEA
+4. Install the ZIP file as described in Option 1
 
 ## Usage
 
@@ -95,22 +109,31 @@ The format should be:
 ]
 ```
 
-## Using Your Existing Reference.java
+## Team Setup
 
-Since you have a Reference.java file with 15,220 lines of constants:
+### Setting up the Reference File
 
-1. Copy your Reference.java file to:
+Each team member needs to place the team's Reference.java file in their home directory:
+
+1. Create the directory:
+   ```bash
+   mkdir -p ~/.reference-lookup
    ```
-   ~/.reference-lookup/Reference.java
+
+2. Copy your team's Reference.java file:
+   ```bash
+   cp /path/to/team/Reference.java ~/.reference-lookup/Reference.java
    ```
 
-2. The plugin will automatically:
+3. The plugin will automatically:
    - Parse all `public static final` constants
    - Extract JavaDoc and inline comments as descriptions
    - Create searchable entries for each constant
    - Support fuzzy search on constant names
 
-3. No conversion needed! The plugin works directly with your Java file.
+### Alternative: Shared Network Location
+
+You can also modify the plugin to read from a shared network location by updating the path in `ReferenceDataService.java`.
 
 ## Development
 
