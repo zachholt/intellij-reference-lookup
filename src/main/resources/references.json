@@ -1,0 +1,62 @@
+[
+  {
+    "code": "HTTP200",
+    "description": "OK - The request has succeeded",
+    "category": "HTTP Status Codes",
+    "tags": ["http", "success", "status"]
+  },
+  {
+    "code": "HTTP404",
+    "description": "Not Found - The server cannot find the requested resource",
+    "category": "HTTP Status Codes",
+    "tags": ["http", "error", "status"]
+  },
+  {
+    "code": "HTTP500",
+    "description": "Internal Server Error - The server encountered an unexpected condition",
+    "category": "HTTP Status Codes",
+    "tags": ["http", "error", "status", "server"]
+  },
+  {
+    "code": "SQL1001",
+    "description": "Syntax error in SQL statement",
+    "category": "Database Errors",
+    "tags": ["sql", "database", "error", "syntax"]
+  },
+  {
+    "code": "SQL1205",
+    "description": "Lock wait timeout exceeded",
+    "category": "Database Errors",
+    "tags": ["sql", "database", "error", "lock", "timeout"]
+  },
+  {
+    "code": "ERR_CONN_001",
+    "description": "Connection timeout - Unable to establish connection within the specified time",
+    "category": "Network Errors",
+    "tags": ["network", "connection", "timeout", "error"]
+  },
+  {
+    "code": "AUTH_FAIL_01",
+    "description": "Invalid credentials provided",
+    "category": "Authentication",
+    "tags": ["auth", "security", "error", "login"]
+  },
+  {
+    "code": "API_RATE_LIMIT",
+    "description": "API rate limit exceeded - Too many requests",
+    "category": "API Errors",
+    "tags": ["api", "rate-limit", "throttle", "error"]
+  },
+  {
+    "code": "CACHE_MISS",
+    "description": "Requested item not found in cache",
+    "category": "Cache",
+    "tags": ["cache", "performance", "miss"]
+  },
+  {
+    "code": "FILE_NOT_FOUND",
+    "description": "The specified file could not be located",
+    "category": "File System",
+    "tags": ["file", "error", "io"]
+  }
+]

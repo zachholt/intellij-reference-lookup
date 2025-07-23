@@ -1,0 +1,30 @@
+<idea-plugin>
+    <id>com.zachholt.reference-lookup</id>
+    <name>Reference Lookup</name>
+    <vendor email="zachholt@example.com" url="https://github.com/zachholt">Zach Holt</vendor>
+
+    <description><![CDATA[
+    A fast and easy-to-use reference lookup tool for IntelliJ IDEA.<br/>
+    <br/>
+    Features:<br/>
+    - Right-click on any selected text to look up references<br/>
+    - Quick search popup with fuzzy matching<br/>
+    - Support for large reference datasets<br/>
+    - Keyboard shortcuts for fast access<br/>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+    </extensions>
+
+    <actions>
+        <action id="com.zachholt.referencelookup.LookupAction"
+                class="com.zachholt.referencelookup.LookupAction"
+                text="Lookup Reference"
+                description="Look up the selected text in the reference database">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu1.FindRefactor"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift L"/>
+        </action>
+    </actions>
+</idea-plugin>
