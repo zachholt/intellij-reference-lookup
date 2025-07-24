@@ -8,11 +8,15 @@ This plugin is designed for internal team use and supports direct parsing of Jav
 
 ## Features
 
+- **NEW: Reference Browser Tool Window**: Persistent window with tabbed interface
+  - List view showing all references with search
+  - Tree view organized by categories
+  - Details panel for complete reference information
 - **Context Menu Integration**: Right-click on any selected text to look up references
-- **Quick Search Popup**: Fast, responsive search with fuzzy matching
-- **Keyboard Shortcuts**: Use `Ctrl+Shift+L` to quickly open the lookup
+- **Quick Access**: View top 10 matches directly in the context menu
+- **Keyboard Shortcuts**: Use `Ctrl+Shift+L` to open the Reference Browser
 - **Smart Search**: Supports partial matches and fuzzy search
-- **Copy to Clipboard**: Double-click or press Enter to copy the code
+- **Copy to Clipboard**: Click on quick matches to copy code instantly
 
 ## Team Installation
 
@@ -46,17 +50,17 @@ This plugin is designed for internal team use and supports direct parsing of Jav
 
 1. **Using Context Menu**:
    - Select any text in the editor
-   - Right-click and choose "Lookup Reference"
-   - Search for your reference in the popup
+   - Right-click and choose "Reference Lookup"
+   - View quick matches in the submenu or click "Open Reference Browser"
 
 2. **Using Keyboard Shortcut**:
-   - Select text and press `Ctrl+Shift+L`
+   - Press `Ctrl+Shift+L` to open the Reference Browser
 
-3. **In the Popup**:
-   - Type to search (supports fuzzy matching)
-   - Use arrow keys to navigate results
-   - Press Enter or double-click to copy the code
-   - Press Escape to close
+3. **In the Reference Browser**:
+   - Use the search field to filter references
+   - Switch between "All References" and "By Category" tabs
+   - Double-click any reference to insert it
+   - View full details in the bottom panel
 
 ## Custom Reference Data
 
