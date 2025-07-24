@@ -34,11 +34,27 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "${{ github.ref_name }}" \
-          --title "Release ${{ steps.get_version.outputs.VERSION }}" \
-          --notes "## Installation
+        # Find the actual plugin ZIP file
+        PLUGIN_ZIP=$(find ./build/distributions -name "*.zip" | head -1)
+        
+        # Create release notes
+        cat > release_notes.md << 'EOF'
+        ## What's New in v${{ steps.get_version.outputs.VERSION }}
 
-        1. Download the \`reference-lookup-${{ steps.get_version.outputs.VERSION }}.zip\` file below
+        ### 🎉 Reference Browser Tool Window
+        - **No More Freezing**: Replaced the problematic popup with a stable tool window
+        - **Dual View Modes**: "All References" and "By Category" tabs
+        - **Enhanced Search**: Real-time filtering across all references
+        - **Details Panel**: See complete reference information at a glance
+
+        ### 🐛 Bug Fixes
+        - Fixed popup window freezing when searching
+        - Fixed long descriptions breaking context menu layout
+        - Resolved package structure inconsistencies
+
+        ## Installation
+
+        1. Download the plugin ZIP file below
         2. Open IntelliJ IDEA
         3. Go to Settings → Plugins → ⚙️ → Install Plugin from Disk
         4. Select the downloaded ZIP file
@@ -47,9 +63,17 @@ jobs:
         ## Setup
 
         Place your team's Reference.java file at:
-        \`\`\`
+        ```
         ~/.reference-lookup/Reference.java
-        \`\`\`
+        ```
 
-        See the [TEAM_SETUP.md](https://github.com/${{ github.repository }}/blob/main/TEAM_SETUP.md) for detailed instructions." \
-          "./build/distributions/reference-lookup-${{ steps.get_version.outputs.VERSION }}.zip#IntelliJ Plugin ZIP"
+        ## Usage
+        - **Quick Access**: Right-click selected text → "Reference Lookup"
+        - **Keyboard Shortcut**: Press `Ctrl+Shift+L` to open the Reference Browser
+        - **Browse by Category**: Use the "By Category" tab for organized view
+        EOF
+        
+        gh release create "${{ github.ref_name }}" \
+          --title "Reference Lookup v${{ steps.get_version.outputs.VERSION }}" \
+          --notes-file release_notes.md \
+          "${PLUGIN_ZIP}#Reference Lookup Plugin v${{ steps.get_version.outputs.VERSION }}"
