@@ -177,4 +177,18 @@ public final class ReferenceDataService {
         }
         return new ArrayList<>(references);
     }
+    
+    public Map<String, List<ReferenceItem>> getReferencesGroupedByCategory() {
+        if (!isLoaded) {
+            loadReferences();
+        }
+        Map<String, List<ReferenceItem>> grouped = new HashMap<>();
+        
+        for (ReferenceItem item : references) {
+            String category = item.getCategory() != null ? item.getCategory() : "Uncategorized";
+            grouped.computeIfAbsent(category, k -> new ArrayList<>()).add(item);
+        }
+        
+        return grouped;
+    }
 }

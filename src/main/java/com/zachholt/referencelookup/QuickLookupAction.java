@@ -66,21 +66,34 @@ public class QuickLookupAction extends ActionGroup {
             
             if (matches.size() > 10) {
                 actions.add(Separator.getInstance());
-                actions.add(new AnAction("... and " + (matches.size() - 10) + " more (Click to search all)") {
+                actions.add(new AnAction("... and " + (matches.size() - 10) + " more (Click to view all)") {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
-                        // Open the full search popup
-                        new LookupAction().actionPerformed(e);
+                        // Open the tool window
+                        Project project = e.getProject();
+                        if (project != null) {
+                            com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
+                                    .getToolWindow("ReferenceBrowser")
+                                    .show();
+                        }
                     }
                 });
             }
             
             // Always add search option at the end
             actions.add(Separator.getInstance());
-            actions.add(new AnAction("Search All References...") {
+            // Removed - we'll just use the Open Reference Browser option below
+            
+            // Add option to open reference browser
+            actions.add(new AnAction("Open Reference Browser") {
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent e) {
-                    new LookupAction().actionPerformed(e);
+                    Project project = e.getProject();
+                    if (project != null) {
+                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
+                                .getToolWindow("ReferenceBrowser")
+                                .show();
+                    }
                 }
             });
         } else {
@@ -98,10 +111,18 @@ public class QuickLookupAction extends ActionGroup {
             
             // Still add search option
             actions.add(Separator.getInstance());
-            actions.add(new AnAction("Search All References...") {
+            // Removed - we'll just use the Open Reference Browser option below
+            
+            // Add option to open reference browser
+            actions.add(new AnAction("Open Reference Browser") {
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent e) {
-                    new LookupAction().actionPerformed(e);
+                    Project project = e.getProject();
+                    if (project != null) {
+                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
+                                .getToolWindow("ReferenceBrowser")
+                                .show();
+                    }
                 }
             });
         }

@@ -16,6 +16,11 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Reference Browser Tool Window -->
+        <toolWindow id="ReferenceBrowser"
+                    secondary="false"
+                    anchor="right"
+                    factoryClass="com.zachholt.referencelookup.ui.ReferenceToolWindowFactory"/>
     </extensions>
 
     <actions>
