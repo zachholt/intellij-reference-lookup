@@ -1,6 +1,6 @@
 plugins {
     id("java")
-    id("org.jetbrains.intellij") version "1.17.0"
+    id("org.jetbrains.intellij") version "1.17.4"
 }
 
 group = "com.zachholt"
@@ -13,7 +13,7 @@ repositories {
 }
 
 intellij {
-    version.set("2024.2")
+    version.set("2024.3")
     type.set("IC") // IntelliJ IDEA Community Edition
     plugins.set(listOf())
 }
@@ -25,8 +25,8 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("233")
-        untilBuild.set("251.*")
+        sinceBuild.set("243")
+        untilBuild.set("253.*")
     }
 
     signPlugin {
