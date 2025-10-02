@@ -112,7 +112,12 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         };
 
         setupUI();
-        loadData();
+
+        // Start loading references in background immediately
+        dataService.loadReferencesAsync();
+
+        // Update UI when loading completes
+        dataService.onLoaded(() -> SwingUtilities.invokeLater(this::loadData));
     }
 
     private void setupUI() {
@@ -253,16 +258,21 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
 
     private void loadData() {
         SwingUtilities.invokeLater(() -> {
+            if (!dataService.isLoaded()) {
+                statusLabel.setText("Loading references...");
+                return;
+            }
+
             // Load list view
             List<ReferenceItem> references = dataService.getAllReferences();
             listModel.clear();
             for (ReferenceItem ref : references) {
                 listModel.addElement(ref);
             }
-            
+
             // Load tree view
             loadTreeData();
-            
+
             updateStatus();
         });
     }
