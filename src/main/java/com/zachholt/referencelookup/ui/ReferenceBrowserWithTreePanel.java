@@ -1,5 +1,9 @@
 package com.zachholt.referencelookup.ui;
 
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.ui.*;
@@ -7,13 +11,17 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.Alarm;
 import com.intellij.util.ui.JBUI;
 import com.zachholt.referencelookup.model.ReferenceItem;
 import com.zachholt.referencelookup.service.ReferenceDataService;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeSelectionEvent;
+import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
@@ -24,22 +32,29 @@ import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.Map;
 
-public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
+public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel implements Disposable {
     private final Project project;
     private final ReferenceDataService dataService;
     private final SearchTextField searchField;
     private final JLabel statusLabel;
     private final JTextArea detailsArea;
     private final JBTabbedPane tabbedPane;
-    
+
     // List view components
     private final DefaultListModel<ReferenceItem> listModel;
     private final JBList<ReferenceItem> referenceList;
-    
+
     // Tree view components
     private final Tree categoryTree;
     private final DefaultTreeModel treeModel;
     private final DefaultMutableTreeNode rootNode;
+
+    // For proper cleanup
+    private final Alarm searchAlarm;
+    private final DocumentListener documentListener;
+    private final TreeSelectionListener treeSelectionListener;
+    private final MouseAdapter listMouseListener;
+    private final MouseAdapter treeMouseListener;
 
     public ReferenceBrowserWithTreePanel(Project project) {
         super(true, true);
@@ -49,16 +64,53 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
         this.statusLabel = new JLabel(" ");
         this.detailsArea = new JTextArea();
         this.tabbedPane = new JBTabbedPane();
-        
+
         // List components
         this.listModel = new DefaultListModel<>();
         this.referenceList = new JBList<>(listModel);
-        
+
         // Tree components
         this.rootNode = new DefaultMutableTreeNode("All References");
         this.treeModel = new DefaultTreeModel(rootNode);
         this.categoryTree = new Tree(treeModel);
-        
+
+        // Initialize alarm for debounced search (300ms delay)
+        this.searchAlarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, this);
+
+        // Create listeners that we'll clean up later
+        this.documentListener = new DocumentAdapter() {
+            @Override
+            protected void textChanged(DocumentEvent e) {
+                scheduleFilter();
+            }
+        };
+
+        this.treeSelectionListener = this::updateDetailsFromTree;
+
+        this.listMouseListener = new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    insertSelectedReference(referenceList.getSelectedValue());
+                }
+            }
+        };
+
+        this.treeMouseListener = new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    TreePath path = categoryTree.getPathForLocation(e.getX(), e.getY());
+                    if (path != null) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                        if (node.getUserObject() instanceof ReferenceItem) {
+                            insertSelectedReference((ReferenceItem) node.getUserObject());
+                        }
+                    }
+                }
+            }
+        };
+
         setupUI();
         loadData();
     }
@@ -97,14 +149,9 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
     private JPanel createSearchPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(JBUI.Borders.empty(5));
-        
-        searchField.getTextEditor().getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(DocumentEvent e) {
-                filterContent();
-            }
-        });
-        
+
+        searchField.getTextEditor().getDocument().addDocumentListener(documentListener);
+
         panel.add(searchField, BorderLayout.CENTER);
         return panel;
     }
@@ -134,16 +181,9 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
                 updateDetailsFromList();
             }
         });
-        
+
         // Double-click to insert
-        referenceList.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    insertSelectedReference(referenceList.getSelectedValue());
-                }
-            }
-        });
+        referenceList.addMouseListener(listMouseListener);
         
         JBScrollPane scrollPane = new JBScrollPane(referenceList);
         tabbedPane.addTab("All References", scrollPane);
@@ -177,23 +217,10 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
             }
         });
         
-        categoryTree.addTreeSelectionListener(this::updateDetailsFromTree);
-        
+        categoryTree.addTreeSelectionListener(treeSelectionListener);
+
         // Double-click to insert
-        categoryTree.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    TreePath path = categoryTree.getPathForLocation(e.getX(), e.getY());
-                    if (path != null) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-                        if (node.getUserObject() instanceof ReferenceItem) {
-                            insertSelectedReference((ReferenceItem) node.getUserObject());
-                        }
-                    }
-                }
-            }
-        });
+        categoryTree.addMouseListener(treeMouseListener);
         
         JBScrollPane scrollPane = new JBScrollPane(categoryTree);
         tabbedPane.addTab("By Category", scrollPane);
@@ -257,64 +284,79 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
         }
         
         treeModel.reload();
-        
-        // Expand all categories
-        for (int i = 0; i < categoryTree.getRowCount(); i++) {
-            categoryTree.expandRow(i);
+
+        // Only expand if there are a reasonable number of rows (avoid performance hit)
+        if (categoryTree.getRowCount() <= 50) {
+            for (int i = 0; i < categoryTree.getRowCount(); i++) {
+                categoryTree.expandRow(i);
+            }
         }
+    }
+
+    // Debounced filter - only runs search after user stops typing for 300ms
+    private void scheduleFilter() {
+        searchAlarm.cancelAllRequests();
+        searchAlarm.addRequest(() -> filterContent(), 300);
     }
 
     private void filterContent() {
         String searchText = searchField.getText().trim();
-        
-        SwingUtilities.invokeLater(() -> {
-            if (searchText.isEmpty()) {
-                loadData();
-            } else {
+
+        if (searchText.isEmpty()) {
+            SwingUtilities.invokeLater(this::loadData);
+            return;
+        }
+
+        // Run search in background to avoid blocking UI
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            List<ReferenceItem> filtered = dataService.search(searchText);
+
+            // Update UI on EDT
+            SwingUtilities.invokeLater(() -> {
                 // Filter list view
-                List<ReferenceItem> filtered = dataService.search(searchText);
                 listModel.clear();
                 for (ReferenceItem ref : filtered) {
                     listModel.addElement(ref);
                 }
-                
+
                 // Filter tree view
-                filterTreeData(searchText);
-                
+                filterTreeData(filtered);
+
                 updateStatus();
-            }
+            });
         });
     }
 
-    private void filterTreeData(String searchText) {
+    private void filterTreeData(List<ReferenceItem> filtered) {
         rootNode.removeAllChildren();
-        
-        List<ReferenceItem> filtered = dataService.search(searchText);
+
         Map<String, List<ReferenceItem>> grouped = new java.util.HashMap<>();
-        
+
         // Group filtered results by category
         for (ReferenceItem item : filtered) {
             String category = item.getCategory() != null ? item.getCategory() : "Uncategorized";
             grouped.computeIfAbsent(category, k -> new java.util.ArrayList<>()).add(item);
         }
-        
+
         // Build tree
         for (Map.Entry<String, List<ReferenceItem>> entry : grouped.entrySet()) {
             DefaultMutableTreeNode categoryNode = new DefaultMutableTreeNode(entry.getKey());
-            
+
             for (ReferenceItem item : entry.getValue()) {
                 DefaultMutableTreeNode itemNode = new DefaultMutableTreeNode(item);
                 categoryNode.add(itemNode);
             }
-            
+
             rootNode.add(categoryNode);
         }
-        
+
         treeModel.reload();
-        
-        // Expand all categories
-        for (int i = 0; i < categoryTree.getRowCount(); i++) {
-            categoryTree.expandRow(i);
+
+        // Only expand if there are a reasonable number of rows (avoid performance hit)
+        if (categoryTree.getRowCount() <= 50) {
+            for (int i = 0; i < categoryTree.getRowCount(); i++) {
+                categoryTree.expandRow(i);
+            }
         }
     }
 
@@ -366,10 +408,26 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel {
     private void insertSelectedReference(ReferenceItem item) {
         if (item != null) {
             // TODO: Insert into editor
-            JOptionPane.showMessageDialog(this, 
-                "Would insert: " + item.getCode(), 
-                "Reference", 
+            JOptionPane.showMessageDialog(this,
+                "Would insert: " + item.getCode(),
+                "Reference",
                 JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    @Override
+    public void dispose() {
+        // Cancel any pending search requests
+        searchAlarm.cancelAllRequests();
+
+        // Remove all listeners to prevent memory leaks
+        searchField.getTextEditor().getDocument().removeDocumentListener(documentListener);
+        categoryTree.removeTreeSelectionListener(treeSelectionListener);
+        referenceList.removeMouseListener(listMouseListener);
+        categoryTree.removeMouseListener(treeMouseListener);
+
+        // Clear data structures
+        listModel.clear();
+        rootNode.removeAllChildren();
     }
 }
