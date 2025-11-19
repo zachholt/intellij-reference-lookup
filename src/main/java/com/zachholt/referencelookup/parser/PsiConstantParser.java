@@ -124,18 +124,70 @@ public class PsiConstantParser {
             ));
         }
         
-        private String cleanValue(String value) {
-            // Simple cleanup for "quoted strings"
-            if (value.startsWith("\"") && value.endsWith("\"")) {
-                return value.substring(1, value.length() - 1);
+            private String cleanValue(String value) {
+                // Simple cleanup for "quoted strings"
+                if (value.startsWith("\"") && value.endsWith("\"")) {
+                    return value.substring(1, value.length() - 1);
+                }
+                return value;
             }
-            return value;
-        }
         
-        // ... (keep extractDescription as is)
-    
-        private String cleanJavaDoc(String text) {
-            if (text == null) return "";
+            private String extractDescription(PsiField field) {
+                // 1. Try JavaDoc
+                PsiDocComment docComment = field.getDocComment();
+                if (docComment != null) {
+                    return cleanJavaDoc(docComment.getText());
+                }
+        
+                // 2. Try End-of-line comment (// ...)
+                PsiElement next = field.getNextSibling();
+                while (next != null) {
+                    if (next instanceof PsiComment) {
+                        String text = next.getText().trim();
+                        if (text.startsWith("//")) {
+                            return text.substring(2).trim();
+                        }
+                        break; 
+                    }
+                    if (next instanceof PsiWhiteSpace) {
+                        if (next.getText().contains("\n")) {
+                            break; 
+                        }
+                    } else {
+                        // found something else
+                    }
+                    next = next.getNextSibling();
+                }
+        
+                // 3. Try Comment *above* the field (if not JavaDoc)
+                PsiElement prev = field.getPrevSibling();
+                while (prev != null) {
+                     if (prev instanceof PsiComment) {
+                         if (prev instanceof PsiDocComment) {
+                             prev = prev.getPrevSibling();
+                             continue;
+                         }
+                         String text = prev.getText().trim();
+                         if (text.startsWith("//")) {
+                             return text.substring(2).trim();
+                         } else if (text.startsWith("/*")) {
+                             return text.replace("/*", "").replace("*/", "").trim();
+                         }
+                         break;
+                     }
+                     if (prev instanceof PsiWhiteSpace) {
+                         int newLines = prev.getText().split("\n", -1).length - 1;
+                         if (newLines > 1) break; 
+                     } else {
+                         break; 
+                     }
+                     prev = prev.getPrevSibling();
+                }
+        
+                return "";
+            }
+        
+            private String cleanJavaDoc(String text) {            if (text == null) return "";
             return text.replaceAll("/\\*\\*", "")
                        .replaceAll("\\*/", "")
                        .replaceAll("(?m)^\\s*\\*\\s?", "") // Remove leading * on each line (multiline mode)

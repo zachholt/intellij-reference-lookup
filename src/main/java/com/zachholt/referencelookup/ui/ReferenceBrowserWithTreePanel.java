@@ -432,7 +432,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         categoryTree.removeMouseListener(treeMouseListener);
 
         // Clear data structures
-        listModel.clear();
+        listModel.removeAll();
         rootNode.removeAllChildren();
     }
 }
