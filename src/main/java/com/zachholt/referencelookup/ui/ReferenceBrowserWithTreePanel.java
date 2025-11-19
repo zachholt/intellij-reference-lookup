@@ -13,6 +13,7 @@ import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.Alarm;
 import com.intellij.util.ui.JBUI;
+import com.zachholt.referencelookup.ReferenceBundle;
 import com.zachholt.referencelookup.model.ReferenceItem;
 import com.zachholt.referencelookup.service.ReferenceDataService;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +42,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
     private final JBTabbedPane tabbedPane;
 
     // List view components
-    private final DefaultListModel<ReferenceItem> listModel;
+    private final CollectionListModel<ReferenceItem> listModel;
     private final JBList<ReferenceItem> referenceList;
 
     // Tree view components
@@ -66,11 +67,11 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         this.tabbedPane = new JBTabbedPane();
 
         // List components
-        this.listModel = new DefaultListModel<>();
+        this.listModel = new CollectionListModel<>();
         this.referenceList = new JBList<>(listModel);
 
         // Tree components
-        this.rootNode = new DefaultMutableTreeNode("All References");
+        this.rootNode = new DefaultMutableTreeNode(ReferenceBundle.message("tab.all_references"));
         this.treeModel = new DefaultTreeModel(rootNode);
         this.categoryTree = new Tree(treeModel);
 
@@ -191,7 +192,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         referenceList.addMouseListener(listMouseListener);
         
         JBScrollPane scrollPane = new JBScrollPane(referenceList);
-        tabbedPane.addTab("All References", scrollPane);
+        tabbedPane.addTab(ReferenceBundle.message("tab.all_references"), scrollPane);
     }
 
     private void setupTreeView() {
@@ -228,7 +229,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         categoryTree.addMouseListener(treeMouseListener);
         
         JBScrollPane scrollPane = new JBScrollPane(categoryTree);
-        tabbedPane.addTab("By Category", scrollPane);
+        tabbedPane.addTab(ReferenceBundle.message("tab.by_category"), scrollPane);
     }
 
     private JPanel createDetailsPanel() {
@@ -259,16 +260,13 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
     private void loadData() {
         SwingUtilities.invokeLater(() -> {
             if (!dataService.isLoaded()) {
-                statusLabel.setText("Loading references...");
+                statusLabel.setText(ReferenceBundle.message("label.loading"));
                 return;
             }
 
-            // Load list view
+            // Load list view efficiently
             List<ReferenceItem> references = dataService.getAllReferences();
-            listModel.clear();
-            for (ReferenceItem ref : references) {
-                listModel.addElement(ref);
-            }
+            listModel.replaceAll(references);
 
             // Load tree view
             loadTreeData();
@@ -323,11 +321,8 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
 
             // Update UI on EDT
             SwingUtilities.invokeLater(() -> {
-                // Filter list view
-                listModel.clear();
-                for (ReferenceItem ref : filtered) {
-                    listModel.addElement(ref);
-                }
+                // Filter list view efficiently
+                listModel.replaceAll(filtered);
 
                 // Filter tree view
                 filterTreeData(filtered);
@@ -409,9 +404,9 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         int total = dataService.getAllReferences().size();
         int shown = listModel.getSize();
         if (shown < total) {
-            statusLabel.setText(String.format("Showing %d of %d references", shown, total));
+            statusLabel.setText(ReferenceBundle.message("label.showing_matches", shown, total));
         } else {
-            statusLabel.setText(String.format("%d references", total));
+            statusLabel.setText(ReferenceBundle.message("label.all_references", total));
         }
     }
 

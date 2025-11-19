@@ -22,8 +22,19 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    
+    <resource-bundle>messages.ReferenceBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Settings -->
+        <applicationService serviceImplementation="com.zachholt.referencelookup.settings.ReferenceSettingsState"/>
+        <applicationConfigurable parentId="tools" 
+                               instance="com.zachholt.referencelookup.settings.ReferenceSettingsConfigurable"
+                               id="com.zachholt.referencelookup.settings.ReferenceSettingsConfigurable"
+                               displayName="Reference Lookup"/>
+
+        <projectService serviceImplementation="com.zachholt.referencelookup.service.ReferenceDataService"/>
         <!-- Reference Browser Tool Window -->
         <toolWindow id="ReferenceBrowser"
                     secondary="false"

@@ -52,9 +52,37 @@ public class QuickLookupAction extends ActionGroup {
         
         List<AnAction> actions = new ArrayList<>();
         
-        // Search for matches first
         ReferenceDataService service = ReferenceDataService.getInstance(project);
-        List<ReferenceItem> matches = service.search(selectedText.trim());
+        
+        if (!service.isLoaded()) {
+            service.loadReferencesAsync();
+            actions.add(new AnAction("Loading references...") {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e) {
+                    // Do nothing
+                }
+                
+                @Override
+                public void update(@NotNull AnActionEvent e) {
+                    e.getPresentation().setEnabled(false);
+                }
+            });
+             actions.add(new AnAction("Open Reference Browser") {
+                @Override
+                public void actionPerformed(@NotNull AnActionEvent e) {
+                    Project project = e.getProject();
+                    if (project != null) {
+                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
+                                .getToolWindow("ReferenceBrowser")
+                                .show();
+                    }
+                }
+            });
+            return actions.toArray(new AnAction[0]);
+        }
+
+        // Search for matches first
+        List<ReferenceItem> matches = service.search(selectedText.trim(), 11);
         
         if (!matches.isEmpty()) {
             // Add quick results (limit to first 10)

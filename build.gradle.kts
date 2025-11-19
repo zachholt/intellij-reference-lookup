@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
 plugins {
     id("java")
     id("org.jetbrains.intellij.platform") version "2.7.2"
@@ -18,10 +20,14 @@ repositories {
 
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.assertj:assertj-core:3.24.2")
     
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
         pluginVerifier()
+        testFramework(TestFrameworkType.Platform)
     }
 }
 
