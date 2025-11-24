@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.3] - 2025-11-24
+
+### Fixed
+- **CI/CD**: Updated GitHub Actions workflow to use Java 21, fixing build failures caused by the project's upgrade to Java 21.
+
 ## [2.2.2] - 2025-11-24
 
 ### Fixed
