@@ -32,7 +32,7 @@ dependencies {
     
     intellijPlatform {
         localIdePath?.let {
-            localPath(it)
+            local(it)
         } ?: intellijIdeaCommunity("2024.2.4")
         bundledPlugin("com.intellij.java")
         pluginVerifier()
