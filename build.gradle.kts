@@ -4,10 +4,11 @@ import java.util.Properties
 plugins {
     id("java")
     id("org.jetbrains.intellij.platform") version "2.2.1"
+    id("org.jetbrains.changelog") version "2.2.1"
 }
 
-group = "com.zachholt"
-version = "2.2.4" // Starting with a fresh version bump
+group = providers.gradleProperty("pluginGroup").get()
+version = providers.gradleProperty("pluginVersion").get()
 
 repositories {
     mavenCentral()
@@ -16,7 +17,6 @@ repositories {
         defaultRepositories()
         releases()
         marketplace()
-        // Add explicit JetBrains repositories for reliability
         maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases")
         maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/snapshots")
         intellijDependencies()
@@ -26,38 +26,31 @@ repositories {
 // Allow local IntelliJ installation to avoid remote downloads when available.
 val localIdePath = run {
     var path: String? = null
-    
-    // 1. Check local.properties
     val localPropsFile = file("local.properties")
     if (localPropsFile.exists()) {
         val props = Properties()
         localPropsFile.inputStream().use { props.load(it) }
         path = props.getProperty("intellij.localPath")
     }
-    
-    // 2. Check Env Var
-    if (path == null) {
-        path = System.getenv("INTELLIJ_LOCAL_PATH")
-    }
-    
-    // 3. Check Gradle Property
-    if (path == null) {
-        path = providers.gradleProperty("intellij.localPath").orNull
-    }
-    
+    if (path == null) path = System.getenv("INTELLIJ_LOCAL_PATH")
+    if (path == null) path = providers.gradleProperty("intellij.localPath").orNull
     path
 }
 
 dependencies {
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:${providers.gradleProperty("gsonVersion").get()}")
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.assertj:assertj-core:3.24.2")
+    testImplementation("junit:junit:${providers.gradleProperty("junitVersion").get()}")
+    testImplementation("org.assertj:assertj-core:${providers.gradleProperty("assertjVersion").get()}")
     
     intellijPlatform {
         localIdePath?.let {
             local(it)
-        } ?: intellijIdeaCommunity("2024.2.4")
+        } ?: create(
+            providers.gradleProperty("platformType"),
+            providers.gradleProperty("platformVersion")
+        )
+        
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         testFramework(TestFrameworkType.Platform)
@@ -66,13 +59,13 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
-        id = "com.zachholt.reference-lookup"
-        name = "Reference Lookup"
-        version = project.version.toString()
+        id = providers.gradleProperty("pluginId")
+        name = providers.gradleProperty("pluginName")
+        version = providers.gradleProperty("pluginVersion")
         
         ideaVersion {
-            sinceBuild = "241" // Support 2024.1+
-            // No untilBuild to support future versions (2025.x+)
+            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
     }
     
@@ -85,10 +78,25 @@ intellijPlatform {
     publishing {
         token = System.getenv("PUBLISH_TOKEN")
     }
+    
+    buildSearchableOptions = false
+}
+
+changelog {
+    version = providers.gradleProperty("pluginVersion").get()
+    path = file("CHANGELOG.md").canonicalPath
+    groups.set(emptyList())
 }
 
 java {
-    // Target Java 17 for broad compatibility while running on Java 21 (2024.3+)
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.toVersion(providers.gradleProperty("javaVersion").get())
+    targetCompatibility = JavaVersion.toVersion(providers.gradleProperty("javaVersion").get())
+}
+
+tasks {
+    // Set the compatibility of the compile tasks
+    withType<JavaCompile> {
+        sourceCompatibility = providers.gradleProperty("javaVersion").get()
+        targetCompatibility = providers.gradleProperty("javaVersion").get()
+    }
 }

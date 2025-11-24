@@ -1,1 +1,1 @@
-rootProject.name = "reference-lookup-v2"
+rootProject.name = "reference-lookup"
