@@ -30,6 +30,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
 
       # Set up the Java environment for the next steps
       - name: Setup Java
@@ -71,30 +72,80 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.event.release.tag_name }} ./build/distributions/*
 
-      # Create a pull request
-      - name: Create Pull Request
-        if: ${{ steps.properties.outputs.changelog != '' }}
+      # Create a PR with changelog update and version bump for next development cycle
+      - name: Prepare Next Development Cycle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ github.event.release.tag_name }}"
-          BRANCH="changelog-update-$VERSION"
-          LABEL="release changelog"
+          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix if present
 
+          # Extract current version and bump patch number
+          CURRENT_VERSION=$(grep "^pluginVersion=" gradle.properties | cut -d'=' -f2)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+
+          echo "Preparing next development cycle: $CURRENT_VERSION -> $NEXT_VERSION"
+
+          # Configure git
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
 
+          # Switch to main branch to create PR
+          git fetch origin main
+          git checkout main
+
+          # Apply changelog changes from the tag if they exist
+          if git diff --name-only $VERSION -- CHANGELOG.md | grep -q CHANGELOG.md; then
+            git checkout $VERSION -- CHANGELOG.md
+          fi
+
+          # Update gradle.properties with next version
+          sed -i "s/^pluginVersion=.*/pluginVersion=$NEXT_VERSION/" gradle.properties
+
+          # Add Unreleased section to CHANGELOG.md if it doesn't exist
+          if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+            # Insert after the first heading line
+            sed -i '/^# /a\
+\
+## [Unreleased]\
+### Added\
+\
+### Changed\
+\
+### Fixed\
+' CHANGELOG.md
+          fi
+
+          # Check if there are changes to commit
+          if git diff --quiet gradle.properties CHANGELOG.md; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Create branch and PR
+          BRANCH="post-release-$VERSION_NUM"
+          LABEL="release"
+
           git checkout -b $BRANCH
-          git commit -am "Changelog update - $VERSION"
+          git add gradle.properties CHANGELOG.md
+          git commit -m "Prepare for next development cycle after $VERSION_NUM"
           git push --set-upstream origin $BRANCH
-          
+
           gh label create "$LABEL" \
-            --description "Pull requests with release changelog update" \
+            --description "Release-related pull requests" \
             --force \
             || true
 
           gh pr create \
-            --title "Changelog update - \`$VERSION\`" \
-            --body "Current pull request contains patched \`CHANGELOG.md\` file for the \`$VERSION\` version." \
+            --title "Post-release: Bump to $NEXT_VERSION" \
+            --body "Automated post-release PR after $VERSION_NUM.
+
+## Changes
+- Bumps \`pluginVersion\` to \`$NEXT_VERSION\` in \`gradle.properties\`
+- Updates \`CHANGELOG.md\` with release notes
+- Adds \`[Unreleased]\` section for tracking upcoming changes
+
+Please merge this to continue development." \
             --label "$LABEL" \
             --head $BRANCH

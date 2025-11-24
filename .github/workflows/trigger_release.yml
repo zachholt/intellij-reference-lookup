@@ -9,13 +9,24 @@ on:
         type: string
 
 jobs:
-  create-tag:
+  create-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Validate Version Format
         run: |
           if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -23,30 +34,54 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Version Matches gradle.properties
+        run: |
+          GRADLE_VERSION=$(grep "^pluginVersion=" gradle.properties | cut -d'=' -f2)
+          if [[ "$GRADLE_VERSION" != "${{ inputs.version }}" ]]; then
+            echo "::error::Version mismatch! gradle.properties has $GRADLE_VERSION but you specified ${{ inputs.version }}"
+            echo "Please update gradle.properties first or use the correct version."
+            exit 1
+          fi
+
       - name: Verify Changelog Entry
         run: |
-          # Check if the version header exists in CHANGELOG.md
-          # Escaping brackets for grep
           if ! grep -Fq "## [${{ inputs.version }}]" CHANGELOG.md; then
             echo "::error::No entry found for [${{ inputs.version }}] in CHANGELOG.md. Please update the changelog first."
             exit 1
           fi
 
-      - name: Create and Push Tag
+      - name: Check Tag Does Not Exist
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
           TAG="v${{ inputs.version }}"
-          
-          # Check if tag already exists
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "::error::Tag $TAG already exists!"
             exit 1
           fi
-          
+
+      - name: Extract Release Notes
+        id: changelog
+        run: |
+          RELEASE_NOTE="./build/tmp/release_note.txt"
+          mkdir -p "$(dirname "$RELEASE_NOTE")"
+          ./gradlew getChangelog --no-header --quiet --console=plain --output-file=$RELEASE_NOTE
+          echo "notes_file=$RELEASE_NOTE" >> $GITHUB_OUTPUT
+
+      - name: Create Tag and Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ inputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           echo "Creating tag $TAG..."
           git tag -a "$TAG" -m "Release ${{ inputs.version }}"
           git push origin "$TAG"
-          
-          echo "✅ Tag $TAG pushed! This will trigger the 'Release' workflow automatically."
+
+          echo "Creating GitHub release..."
+          gh release create "$TAG" \
+            --title "${{ inputs.version }}" \
+            --notes-file "${{ steps.changelog.outputs.notes_file }}"
+
+          echo "✅ Release ${{ inputs.version }} created! The Release workflow will now publish to JetBrains Marketplace."
