@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import java.util.Properties
 
 plugins {
     id("java")
@@ -24,10 +25,29 @@ repositories {
 }
 
 // Allow local IntelliJ installation to avoid remote downloads when available.
-// Set INTELLIJ_LOCAL_PATH env var or -Pintellij.localPath=/path/to/IDE.
-val localIdePath = providers.environmentVariable("INTELLIJ_LOCAL_PATH")
-    .orElse(providers.gradleProperty("intellij.localPath"))
-    .orNull
+val localIdePath = run {
+    var path: String? = null
+    
+    // 1. Check local.properties
+    val localPropsFile = file("local.properties")
+    if (localPropsFile.exists()) {
+        val props = Properties()
+        localPropsFile.inputStream().use { props.load(it) }
+        path = props.getProperty("intellij.localPath")
+    }
+    
+    // 2. Check Env Var
+    if (path == null) {
+        path = System.getenv("INTELLIJ_LOCAL_PATH")
+    }
+    
+    // 3. Check Gradle Property
+    if (path == null) {
+        path = providers.gradleProperty("intellij.localPath").orNull
+    }
+    
+    path
+}
 
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
@@ -55,8 +75,8 @@ intellijPlatform {
         } ?: "1.0.0"
         
         ideaVersion {
-            sinceBuild = "242"
-            untilBuild = "242.*"
+            sinceBuild = "243"
+            untilBuild = "243.*"
         }
     }
     

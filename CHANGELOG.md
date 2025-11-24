@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.1] - 2025-11-24
+
+### Fixed
+- **Java Parser**: Fixed regex to correctly identify primitive types (`int`, `boolean`, etc.) in constants.
+- **JavaDoc Parsing**: Fixed issue where single-line JavaDoc comments (`/** ... */`) were incorrectly reading preceding lines.
+
+### Added
+- **Performance Logging**: Added detailed timing logs for data loading, indexing, and slow search queries to `idea.log`.
+- **Local Development**: Added support for `local.properties` to configure local IntelliJ paths without affecting git.
+
+### Changed
+- **Build System**: Updated project to use Java 21 for compatibility with IntelliJ 2024.3+.
+- **Dependencies**: Fixed missing `instrumentationTools` and repository configurations for local builds.
+
 ## [2.0.0] - 2024-07-24
 
 ### Added

@@ -77,6 +77,7 @@ public final class ReferenceDataService {
 
         // Run file I/O on background thread to avoid blocking UI
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            long startTime = System.currentTimeMillis();
             try {
                 LOG.info("Starting background load of references...");
                 
@@ -132,17 +133,20 @@ public final class ReferenceDataService {
 
                 lock.writeLock().lock();
                 try {
+                    long indexStart = System.currentTimeMillis();
                     references.clear();
                     references.addAll(loadedItems);
                     buildIndex();
+                    long indexDuration = System.currentTimeMillis() - indexStart;
                     isLoaded = true;
-                    LOG.info("Loaded " + references.size() + " reference items");
+                    long totalDuration = System.currentTimeMillis() - startTime;
+                    LOG.info("Loaded " + references.size() + " reference items in " + totalDuration + "ms (Indexing: " + indexDuration + "ms)");
                 } finally {
                     lock.writeLock().unlock();
                 }
 
             } catch (Exception e) {
-                LOG.error("Failed to load references", e);
+                LOG.error("Failed to load references (took " + (System.currentTimeMillis() - startTime) + "ms)", e);
             } finally {
                 isLoading = false;
                 // Notify listeners regardless of success/failure to prevent them from waiting forever
@@ -308,6 +312,7 @@ public final class ReferenceDataService {
         }
 
         lock.readLock().lock();
+        long searchStart = System.currentTimeMillis();
         try {
             String normalizedQuery = query.toLowerCase().trim();
             Set<ReferenceItem> results = new LinkedHashSet<>();
@@ -351,6 +356,10 @@ public final class ReferenceDataService {
 
             return new ArrayList<>(results);
         } finally {
+            long duration = System.currentTimeMillis() - searchStart;
+            if (duration > 10) {
+                LOG.debug("Search for '" + query + "' took " + duration + "ms");
+            }
             lock.readLock().unlock();
         }
     }
