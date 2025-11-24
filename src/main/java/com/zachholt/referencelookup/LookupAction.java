@@ -5,12 +5,15 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.content.Content;
+import com.zachholt.referencelookup.ui.ReferenceBrowserWithTreePanel;
 import org.jetbrains.annotations.NotNull;
 
-public class LookupAction extends AnAction {
+public class LookupAction extends AnAction implements DumbAware {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -23,15 +26,25 @@ public class LookupAction extends AnAction {
         
         if (toolWindow != null) {
             toolWindow.show();
-            
-            // TODO: If we have selected text, we could set it in the search field
+
             Editor editor = e.getData(CommonDataKeys.EDITOR);
             if (editor != null) {
                 SelectionModel selectionModel = editor.getSelectionModel();
                 String selectedText = selectionModel.getSelectedText();
-                if (selectedText != null && !selectedText.trim().isEmpty()) {
-                    // In the future, we could pass the selected text to the tool window
-                    // to automatically search for it
+                if (selectedText != null) {
+                    String trimmed = selectedText.trim();
+                    if (!trimmed.isEmpty()) {
+                        Content content = toolWindow.getContentManager().getSelectedContent();
+                        if (content == null && toolWindow.getContentManager().getContentCount() > 0) {
+                            content = toolWindow.getContentManager().getContent(0);
+                        }
+                        if (content != null) {
+                            ReferenceBrowserWithTreePanel panel = content.getUserData(ReferenceBrowserWithTreePanel.PANEL_KEY);
+                            if (panel != null) {
+                                panel.setSearchText(trimmed);
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBList;
@@ -34,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel implements Disposable {
+    public static final Key<ReferenceBrowserWithTreePanel> PANEL_KEY = Key.create("ReferenceBrowserPanel");
+
     private final Project project;
     private final ReferenceDataService dataService;
     private final SearchTextField searchField;
@@ -119,6 +122,11 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
 
         // Update UI when loading completes
         dataService.onLoaded(() -> SwingUtilities.invokeLater(this::loadData));
+    }
+
+    public void setSearchText(String text) {
+        searchField.setText(text);
+        scheduleFilter();
     }
 
     private void setupUI() {

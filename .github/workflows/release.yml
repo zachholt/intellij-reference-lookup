@@ -28,8 +28,8 @@ jobs:
       with:
         cache-read-only: false
     
-    - name: Build plugin
-      run: ./gradlew buildPlugin -x buildSearchableOptions
+    - name: Build and verify plugin
+      run: ./gradlew buildPlugin verifyPlugin -x buildSearchableOptions
     
     - name: Get version from tag
       id: get_version

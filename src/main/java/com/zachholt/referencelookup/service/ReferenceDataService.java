@@ -35,6 +35,9 @@ public final class ReferenceDataService {
     private final Map<String, List<ReferenceItem>> cachedGroupedReferences = new ConcurrentHashMap<>();
     // Code index for exact matches
     private final Map<String, List<ReferenceItem>> codeIndex = new HashMap<>();
+    // Cached lowercase values to avoid repeated allocations during search
+    private final Map<ReferenceItem, String> codeLowerCache = new IdentityHashMap<>();
+    private final Map<ReferenceItem, String> descriptionLowerCache = new IdentityHashMap<>();
     
     private final Project project;
     
@@ -255,14 +258,26 @@ public final class ReferenceDataService {
     private void buildIndex() {
         codeIndex.clear();
         cachedGroupedReferences.clear();
+        codeLowerCache.clear();
+        descriptionLowerCache.clear();
         
         for (ReferenceItem item : references) {
-            String code = item.getCode().toLowerCase();
+            String code = item.getCode();
+            if (code == null) {
+                continue;
+            }
+
+            String normalizedCode = code.toLowerCase();
+            String normalizedDescription = Optional.ofNullable(item.getDescription())
+                    .map(String::toLowerCase)
+                    .orElse("");
+            codeLowerCache.put(item, normalizedCode);
+            descriptionLowerCache.put(item, normalizedDescription);
             // Index by full code
-            codeIndex.computeIfAbsent(code, k -> new ArrayList<>()).add(item);
+            codeIndex.computeIfAbsent(normalizedCode, k -> new ArrayList<>()).add(item);
             
             // Index by code parts (for partial matches)
-            String[] parts = code.split("[\s-_]");
+            String[] parts = normalizedCode.split("[\\s_-]");
             for (String part : parts) {
                 if (!part.isEmpty()) {
                     codeIndex.computeIfAbsent(part, k -> new ArrayList<>()).add(item);
@@ -309,8 +324,11 @@ public final class ReferenceDataService {
 
             // 2. Contains match (fast)
             for (ReferenceItem item : references) {
-                if (item.getCode().toLowerCase().contains(normalizedQuery) || 
-                    item.getDescription().toLowerCase().contains(normalizedQuery)) {
+                String codeLower = codeLowerCache.getOrDefault(item, "");
+                String descriptionLower = descriptionLowerCache.getOrDefault(item, "");
+
+                if (codeLower.contains(normalizedQuery) ||
+                    descriptionLower.contains(normalizedQuery)) {
                     results.add(item);
                     if (limit > 0 && results.size() >= limit) break;
                 }

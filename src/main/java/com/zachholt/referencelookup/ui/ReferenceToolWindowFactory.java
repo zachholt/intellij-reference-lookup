@@ -15,6 +15,7 @@ public class ReferenceToolWindowFactory implements ToolWindowFactory {
         ReferenceBrowserWithTreePanel browserPanel = new ReferenceBrowserWithTreePanel(project);
         ContentFactory contentFactory = ContentFactory.getInstance();
         Content content = contentFactory.createContent(browserPanel, "", false);
+        content.putUserData(ReferenceBrowserWithTreePanel.PANEL_KEY, browserPanel);
 
         // Register the panel for disposal when content is removed
         Disposer.register(content, browserPanel);

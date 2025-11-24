@@ -148,5 +148,13 @@ To run the plugin in a sandbox IDE:
 
 ## Requirements
 
-- IntelliJ IDEA 2023.3 or later
+- IntelliJ IDEA 2024.2 or later
 - Java 17 or later
+
+### Building with a local IntelliJ install (recommended)
+To avoid downloading the IntelliJ distribution during builds, point the Gradle IntelliJ Platform plugin to your installed IDE:
+```bash
+export INTELLIJ_LOCAL_PATH="/Applications/IntelliJ IDEA.app" # adjust for your OS
+# or: ./gradlew build -Pintellij.localPath=/path/to/IDE
+./gradlew build -x buildSearchableOptions
+```

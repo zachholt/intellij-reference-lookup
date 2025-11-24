@@ -3,16 +3,21 @@ package com.zachholt.referencelookup;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.content.Content;
 import com.zachholt.referencelookup.model.ReferenceItem;
 import com.zachholt.referencelookup.service.ReferenceDataService;
+import com.zachholt.referencelookup.ui.ReferenceBrowserWithTreePanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class QuickLookupAction extends ActionGroup {
+public class QuickLookupAction extends ActionGroup implements DumbAware {
     
     public QuickLookupAction() {
         super("Reference Lookup", true);
@@ -86,24 +91,18 @@ public class QuickLookupAction extends ActionGroup {
         
         if (!matches.isEmpty()) {
             // Add quick results (limit to first 10)
-            int count = Math.min(matches.size(), 10);
+            int count = Math.min(matches.size(), 5);
             for (int i = 0; i < count; i++) {
                 ReferenceItem item = matches.get(i);
                 actions.add(new QuickValueAction(item));
             }
             
-            if (matches.size() > 10) {
+            if (matches.size() > count) {
                 actions.add(Separator.getInstance());
-                actions.add(new AnAction("... and " + (matches.size() - 10) + " more (Click to view all)") {
+                actions.add(new AnAction("... and " + (matches.size() - count) + " more (Open Reference Browser)") {
                     @Override
                     public void actionPerformed(@NotNull AnActionEvent e) {
-                        // Open the tool window
-                        Project project = e.getProject();
-                        if (project != null) {
-                            com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
-                                    .getToolWindow("ReferenceBrowser")
-                                    .show();
-                        }
+                        openToolWindowWithSelection(e, selectedText);
                     }
                 });
             }
@@ -116,12 +115,7 @@ public class QuickLookupAction extends ActionGroup {
             actions.add(new AnAction("Open Reference Browser") {
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent e) {
-                    Project project = e.getProject();
-                    if (project != null) {
-                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
-                                .getToolWindow("ReferenceBrowser")
-                                .show();
-                    }
+                    openToolWindowWithSelection(e, selectedText);
                 }
             });
         } else {
@@ -145,17 +139,36 @@ public class QuickLookupAction extends ActionGroup {
             actions.add(new AnAction("Open Reference Browser") {
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent e) {
-                    Project project = e.getProject();
-                    if (project != null) {
-                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
-                                .getToolWindow("ReferenceBrowser")
-                                .show();
-                    }
+                    openToolWindowWithSelection(e, selectedText);
                 }
             });
         }
         
         return actions.toArray(new AnAction[0]);
+    }
+
+    private void openToolWindowWithSelection(AnActionEvent e, String selection) {
+        Project project = e.getProject();
+        if (project == null) {
+            return;
+        }
+
+        ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ReferenceBrowser");
+        if (toolWindow != null) {
+            toolWindow.show();
+            var contentManager = toolWindow.getContentManager();
+            Content content = contentManager.getSelectedContent();
+            if (content == null && contentManager.getContentCount() > 0) {
+                content = contentManager.getContent(0);
+            }
+
+            if (content != null) {
+                ReferenceBrowserWithTreePanel panel = content.getUserData(ReferenceBrowserWithTreePanel.PANEL_KEY);
+                if (panel != null && selection != null && !selection.trim().isEmpty()) {
+                    panel.setSearchText(selection.trim());
+                }
+            }
+        }
     }
     
     private static class QuickValueAction extends AnAction {

@@ -18,6 +18,12 @@ repositories {
     }
 }
 
+// Allow local IntelliJ installation to avoid remote downloads when available.
+// Set INTELLIJ_LOCAL_PATH env var or -Pintellij.localPath=/path/to/IDE.
+val localIdePath = providers.environmentVariable("INTELLIJ_LOCAL_PATH")
+    .orElse(providers.gradleProperty("intellij.localPath"))
+    .orNull
+
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
@@ -25,7 +31,9 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.24.2")
     
     intellijPlatform {
-        intellijIdeaCommunity("2024.3")
+        localIdePath?.let {
+            localPath(it)
+        } ?: intellijIdeaCommunity("2024.2.4")
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         testFramework(TestFrameworkType.Platform)
@@ -41,8 +49,8 @@ intellijPlatform {
         } ?: "1.0.0"
         
         ideaVersion {
-            sinceBuild = "243"
-            untilBuild = "253.*"
+            sinceBuild = "242"
+            untilBuild = "242.*"
         }
     }
     
