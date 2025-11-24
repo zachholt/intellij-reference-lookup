@@ -4,6 +4,7 @@ import java.util.List;
 
 public class ReferenceItem {
     private String code;
+    private String value;
     private String description;
     private String category;
     private List<String> tags;
@@ -11,11 +12,17 @@ public class ReferenceItem {
     public ReferenceItem() {
     }
 
-    public ReferenceItem(String code, String description, String category, List<String> tags) {
+    public ReferenceItem(String code, String value, String description, String category, List<String> tags) {
         this.code = code;
+        this.value = value;
         this.description = description;
         this.category = category;
         this.tags = tags;
+    }
+    
+    // Backward compatibility constructor
+    public ReferenceItem(String code, String description, String category, List<String> tags) {
+        this(code, null, description, category, tags);
     }
 
     public String getCode() {
@@ -24,6 +31,14 @@ public class ReferenceItem {
 
     public void setCode(String code) {
         this.code = code;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public void setValue(String value) {
+        this.value = value;
     }
 
     public String getDescription() {
@@ -52,6 +67,6 @@ public class ReferenceItem {
 
     @Override
     public String toString() {
-        return code + " - " + description;
+        return code + (value != null ? " (" + value + ")" : "") + " - " + description;
     }
 }

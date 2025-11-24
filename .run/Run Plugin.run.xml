@@ -20,6 +20,15 @@
     <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
     <DebugAllEnabled>false</DebugAllEnabled>
     <RunAsTest>false</RunAsTest>
-    <method v="2" />
+    <method v="2">
+      <option name="BeforeRunTask" enabled="true" doNotCheckErrors="true" task_id="Gradle.BeforeRunTask" task_description="Build Gradle Project">
+        <module name="reference-lookup.main" />
+        <option name="tasks">
+          <list>
+            <option value="build" />
+          </list>
+        </option>
+      </option>
+    </method>
   </configuration>
 </component>

@@ -38,6 +38,7 @@ public final class ReferenceDataService {
     // Cached lowercase values to avoid repeated allocations during search
     private final Map<ReferenceItem, String> codeLowerCache = new IdentityHashMap<>();
     private final Map<ReferenceItem, String> descriptionLowerCache = new IdentityHashMap<>();
+    private final Map<ReferenceItem, String> valueLowerCache = new IdentityHashMap<>();
     
     private final Project project;
     
@@ -264,6 +265,7 @@ public final class ReferenceDataService {
         cachedGroupedReferences.clear();
         codeLowerCache.clear();
         descriptionLowerCache.clear();
+        valueLowerCache.clear();
         
         for (ReferenceItem item : references) {
             String code = item.getCode();
@@ -275,10 +277,21 @@ public final class ReferenceDataService {
             String normalizedDescription = Optional.ofNullable(item.getDescription())
                     .map(String::toLowerCase)
                     .orElse("");
+            String normalizedValue = Optional.ofNullable(item.getValue())
+                    .map(String::toLowerCase)
+                    .orElse("");
+                    
             codeLowerCache.put(item, normalizedCode);
             descriptionLowerCache.put(item, normalizedDescription);
+            valueLowerCache.put(item, normalizedValue);
+            
             // Index by full code
             codeIndex.computeIfAbsent(normalizedCode, k -> new ArrayList<>()).add(item);
+            
+            // Index by value (exact match)
+            if (!normalizedValue.isEmpty()) {
+                codeIndex.computeIfAbsent(normalizedValue, k -> new ArrayList<>()).add(item);
+            }
             
             // Index by code parts (for partial matches)
             String[] parts = normalizedCode.split("[\\s_-]");
@@ -331,9 +344,11 @@ public final class ReferenceDataService {
             for (ReferenceItem item : references) {
                 String codeLower = codeLowerCache.getOrDefault(item, "");
                 String descriptionLower = descriptionLowerCache.getOrDefault(item, "");
+                String valueLower = valueLowerCache.getOrDefault(item, "");
 
                 if (codeLower.contains(normalizedQuery) ||
-                    descriptionLower.contains(normalizedQuery)) {
+                    descriptionLower.contains(normalizedQuery) ||
+                    valueLower.contains(normalizedQuery)) {
                     results.add(item);
                     if (limit > 0 && results.size() >= limit) break;
                 }

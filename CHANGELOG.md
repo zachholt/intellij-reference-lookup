@@ -1,8 +1,12 @@
 <!-- Keep a Changelog guide -> https://keepachangelog.com -->
 
-# Reference Lookup Changelog
+# Changelog
 
-## [Unreleased]
+## [2.4.0] - 2025-11-24
+
+### Added
+- **Value Search**: You can now search for references by their value (e.g., searching "200" finds "HTTP_OK").
+- **Value Display**: The exact value of a constant is now shown in the details panel.
 
 ## [2.3.0] - 2025-11-24
 

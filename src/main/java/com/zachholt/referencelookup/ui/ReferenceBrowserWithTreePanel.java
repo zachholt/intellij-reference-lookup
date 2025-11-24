@@ -446,6 +446,9 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         if (item != null) {
             StringBuilder html = new StringBuilder("<html><body style='font-family: sans-serif;'>");
             html.append("<h2>").append(item.getCode()).append("</h2>");
+            if (item.getValue() != null && !item.getValue().isEmpty()) {
+                html.append("<p><b>Value:</b> ").append(item.getValue()).append("</p>");
+            }
             html.append("<p><b>Description:</b> ").append(item.getDescription()).append("</p>");
             
             if (item.getCategory() != null) {

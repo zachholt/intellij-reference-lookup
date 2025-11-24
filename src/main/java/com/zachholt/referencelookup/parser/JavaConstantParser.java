@@ -75,6 +75,7 @@ public class JavaConstantParser {
                 // Create the reference item
                 ReferenceItem item = new ReferenceItem(
                     constantName,
+                    constantValue,
                     description,
                     extractCategory(constantName),
                     extractTags(constantName, description)
