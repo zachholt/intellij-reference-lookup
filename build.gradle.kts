@@ -2,7 +2,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     id("java")
-    id("org.jetbrains.intellij.platform") version "2.7.2"
+    id("org.jetbrains.intellij.platform") version "2.1.0"
 }
 
 group = "com.zachholt"
@@ -15,6 +15,11 @@ repositories {
     
     intellijPlatform {
         defaultRepositories()
+        releases()
+        marketplace()
+        maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases")
+        maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/snapshots")
+        intellijDependencies()
     }
 }
 
@@ -37,6 +42,7 @@ dependencies {
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         testFramework(TestFrameworkType.Platform)
+        instrumentationTools()
     }
 }
 
@@ -66,6 +72,6 @@ intellijPlatform {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }

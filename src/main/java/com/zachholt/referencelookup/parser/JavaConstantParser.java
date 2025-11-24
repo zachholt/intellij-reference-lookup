@@ -13,10 +13,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class JavaConstantParser {
-    // Pattern to match public static final constants with their values
-    // Updated to handle Integer, Long, etc. object types and valueOf() calls
+    // Simplified pattern to match any type (including primitives and generics)
     private static final Pattern CONSTANT_PATTERN = Pattern.compile(
-        "public\\s+static\\s+final\\s+(?:String|Integer|Long|Double|Float|Boolean|Character|Byte|Short|int|long|double|float|boolean|char|byte|short)\\s+(\\w+)\\s*=\\s*(.+?);"
+        "public\\s+static\\s+final\\s+[\\w<>\\[\\]]+\\s+(\\w+)\\s*=\\s*(.+?);"
     );
     
     // Pattern to match JavaDoc comments
@@ -103,15 +102,19 @@ public class JavaConstantParser {
                 if (line.endsWith("*/")) {
                     // Found end of JavaDoc, now collect until start
                     commentLines.add(line);
-                    searchIndex--;
                     
-                    while (searchIndex >= 0) {
-                        line = lines.get(searchIndex).trim();
-                        commentLines.add(line);
-                        if (line.startsWith("/**")) {
-                            break;
-                        }
+                    // If the same line also starts the comment, we are done
+                    if (!line.startsWith("/**")) {
                         searchIndex--;
+                        
+                        while (searchIndex >= 0) {
+                            line = lines.get(searchIndex).trim();
+                            commentLines.add(line);
+                            if (line.startsWith("/**")) {
+                                break;
+                            }
+                            searchIndex--;
+                        }
                     }
                     
                     // Reverse and parse JavaDoc
