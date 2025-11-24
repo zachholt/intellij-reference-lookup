@@ -42,54 +42,8 @@ jobs:
         # Find the actual plugin ZIP file
         PLUGIN_ZIP=$(find ./build/distributions -name "*.zip" | head -1)
         
-        # Create release notes
-        cat > release_notes.md << 'EOF'
-        ## What's New in v${{ steps.get_version.outputs.VERSION }}
-
-        ### ⚡ Performance Improvements
-        - **Async Loading**: References load in background without blocking IntelliJ
-        - **Debounced Search**: 300ms delay prevents wasteful searches while typing
-        - **Background Execution**: All search operations run on background threads
-        - **Optimized UI Updates**: Tree expansion limited to prevent lag with large datasets
-
-        ### 🛡️ Memory Safety
-        - **No Memory Leaks**: Proper disposal pattern with listener cleanup
-        - **Thread-Safe Access**: ReadWriteLock prevents race conditions
-        - **Single Load Guarantee**: References load exactly once per project
-        - **Resource Cleanup**: All data structures cleared on disposal
-
-        ### 📊 Performance Metrics
-        - Initial load: < 500ms for 1000 items
-        - Search latency: < 50ms for typical queries
-        - Memory usage: < 10MB for 10,000 items
-        - EDT blocking: 0ms (all I/O in background)
-
-        ### 🎉 Previous Features (v2.0+)
-        - **Reference Browser Tool Window**: No more freezing popups
-        - **Dual View Modes**: "All References" and "By Category" tabs
-        - **Enhanced Search**: Real-time filtering across all references
-        - **Details Panel**: See complete reference information at a glance
-
-        ## Installation
-
-        1. Download the plugin ZIP file below
-        2. Open IntelliJ IDEA
-        3. Go to Settings → Plugins → ⚙️ → Install Plugin from Disk
-        4. Select the downloaded ZIP file
-        5. Restart IntelliJ IDEA
-
-        ## Setup
-
-        Place your team's Reference.java file at:
-        ```
-        ~/.reference-lookup/Reference.java
-        ```
-
-        ## Usage
-        - **Quick Access**: Right-click selected text → "Reference Lookup"
-        - **Keyboard Shortcut**: Press `Ctrl+Shift+L` to open the Reference Browser
-        - **Browse by Category**: Use the "By Category" tab for organized view
-        EOF
+        # Extract release notes from CHANGELOG.md
+        python3 .github/scripts/extract_changelog.py "${{ steps.get_version.outputs.VERSION }}" CHANGELOG.md > release_notes.md
         
         gh release create "${{ github.ref_name }}" \
           --title "Reference Lookup v${{ steps.get_version.outputs.VERSION }}" \
