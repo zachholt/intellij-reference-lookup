@@ -7,9 +7,7 @@ plugins {
 }
 
 group = "com.zachholt"
-version = System.getenv("GITHUB_REF")?.let { 
-    if (it.startsWith("refs/tags/v")) it.substring(11) else "1.0.0"
-} ?: "1.0.0"
+version = "2.2.4" // Starting with a fresh version bump
 
 repositories {
     mavenCentral()
@@ -18,6 +16,7 @@ repositories {
         defaultRepositories()
         releases()
         marketplace()
+        // Add explicit JetBrains repositories for reliability
         maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases")
         maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/snapshots")
         intellijDependencies()
@@ -62,7 +61,6 @@ dependencies {
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         testFramework(TestFrameworkType.Platform)
-        instrumentationTools()
     }
 }
 
@@ -70,12 +68,11 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.zachholt.reference-lookup"
         name = "Reference Lookup"
-        version = System.getenv("GITHUB_REF")?.let { 
-            if (it.startsWith("refs/tags/v")) it.substring(11) else "1.0.0"
-        } ?: "1.0.0"
+        version = project.version.toString()
         
         ideaVersion {
-            sinceBuild = "243"
+            sinceBuild = "241" // Support 2024.1+
+            // No untilBuild to support future versions (2025.x+)
         }
     }
     
@@ -91,6 +88,7 @@ intellijPlatform {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    // Target Java 17 for broad compatibility while running on Java 21 (2024.3+)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
