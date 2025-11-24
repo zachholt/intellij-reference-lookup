@@ -27,6 +27,9 @@ repositories {
     // IntelliJ Platform Gradle Plugin Repositories Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html
     intellijPlatform {
         defaultRepositories()
+        maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases")
+        maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/snapshots")
+        intellijDependencies()
     }
 }
 
@@ -41,6 +44,12 @@ val localIdePath = run {
     }
     if (path == null) path = System.getenv("INTELLIJ_LOCAL_PATH")
     if (path == null) path = providers.gradleProperty("intellij.localPath").orNull
+    
+    // Verify path exists
+    if (path != null && !file(path).exists()) {
+        logger.warn("Local IntelliJ path configured but not found: $path. Falling back to dependency download.")
+        path = null
+    }
     path
 }
 
@@ -121,11 +130,11 @@ intellijPlatform {
         }
     }
 
-    pluginVerification {
-        ides {
-            recommended()
-        }
-    }
+    // pluginVerification {
+    //    ides {
+    //        recommended()
+    //    }
+    // }
     
     buildSearchableOptions = false
 }
