@@ -1,22 +1,25 @@
 <!-- Keep a Changelog guide -> https://keepachangelog.com -->
 
-# IntelliJ Platform Plugin Template Changelog
+# Reference Lookup Changelog
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-11-24
+
 ### Added
+- **UI Modernization**: The Reference Browser now uses a standard IntelliJ toolbar look and feel.
+- **Refresh Action**: Added a dedicated Refresh button to the tool window toolbar.
+- **Rich Details Panel**: The details panel now supports HTML rendering for better readability.
+- **Copy Code**: Added a convenient "Copy Code" button to the details panel.
+- **Icons**: Added proper icons for list items and tree nodes (Variables/Folders).
 
-- Add `platformBundledModules` to `gradle.properties` along with `bundledModules()` helper to the Gradle build file
-
-### Changed
-
-- Dependencies - upgrade `org.jetbrains.intellij.platform` to `2.7.1`
+## [2.2.4] - 2025-11-24
 
 ### Fixed
+- **Build**: Resolved CI/CD build failures by migrating to the official IntelliJ Platform Plugin Template.
+- **Stability**: Improved project structure and dependency management.
 
-- GitHub: Fixed the missing `$RELEASE_NOTE ` parent directory in the Release workflow
-
-## [2.3.0] - 2025-08-09
+## [2.2.3] - 2025-11-24
 
 ### Added
 

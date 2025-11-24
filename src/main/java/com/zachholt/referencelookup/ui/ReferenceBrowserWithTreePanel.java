@@ -1,9 +1,10 @@
 package com.zachholt.referencelookup.ui;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
@@ -29,6 +30,7 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
@@ -41,7 +43,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
     private final ReferenceDataService dataService;
     private final SearchTextField searchField;
     private final JLabel statusLabel;
-    private final JTextArea detailsArea;
+    private final JEditorPane detailsArea; // Changed to JEditorPane for HTML
     private final JBTabbedPane tabbedPane;
 
     // List view components
@@ -59,6 +61,8 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
     private final TreeSelectionListener treeSelectionListener;
     private final MouseAdapter listMouseListener;
     private final MouseAdapter treeMouseListener;
+    
+    private ReferenceItem currentSelectedItem;
 
     public ReferenceBrowserWithTreePanel(Project project) {
         super(true, true);
@@ -66,7 +70,11 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         this.dataService = project.getService(ReferenceDataService.class);
         this.searchField = new SearchTextField();
         this.statusLabel = new JLabel(" ");
-        this.detailsArea = new JTextArea();
+        this.detailsArea = new JEditorPane();
+        this.detailsArea.setContentType("text/html");
+        this.detailsArea.setEditable(false);
+        this.detailsArea.setBackground(JBColor.PanelBackground);
+        
         this.tabbedPane = new JBTabbedPane();
 
         // List components
@@ -130,11 +138,33 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
     }
 
     private void setupUI() {
+        // Main Toolbar
+        DefaultActionGroup toolbarGroup = new DefaultActionGroup();
+        toolbarGroup.add(new DumbAwareAction("Refresh", "Reload references", AllIcons.Actions.Refresh) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                dataService.reload();
+                statusLabel.setText("Reloading...");
+                dataService.onLoaded(() -> SwingUtilities.invokeLater(() -> {
+                    loadData();
+                    filterContent(); // Re-apply filter if any
+                }));
+            }
+        });
+        
+        ActionToolbar toolbar = ActionManager.getInstance().createActionToolbar("ReferenceBrowserToolbar", toolbarGroup, true);
+        toolbar.setTargetComponent(this);
+        
         JPanel mainPanel = new JPanel(new BorderLayout());
         
-        // Search panel at the top
+        // Top panel with Toolbar and Search
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(toolbar.getComponent(), BorderLayout.WEST);
+        
         JPanel searchPanel = createSearchPanel();
-        mainPanel.add(searchPanel, BorderLayout.NORTH);
+        topPanel.add(searchPanel, BorderLayout.CENTER);
+        
+        mainPanel.add(topPanel, BorderLayout.NORTH);
         
         // Split pane for tabbed pane and details
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
@@ -162,10 +192,8 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
 
     private JPanel createSearchPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(5));
-
+        panel.setBorder(JBUI.Borders.empty(2));
         searchField.getTextEditor().getDocument().addDocumentListener(documentListener);
-
         panel.add(searchField, BorderLayout.CENTER);
         return panel;
     }
@@ -180,6 +208,7 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
                                                 boolean selected,
                                                 boolean hasFocus) {
                 if (value != null) {
+                    setIcon(AllIcons.Nodes.Variable);
                     append(value.getCode(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
                     append(" - " + value.getDescription(), SimpleTextAttributes.GRAY_ATTRIBUTES);
                     if (value.getCategory() != null) {
@@ -199,8 +228,13 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         // Double-click to insert
         referenceList.addMouseListener(listMouseListener);
         
-        JBScrollPane scrollPane = new JBScrollPane(referenceList);
-        tabbedPane.addTab(ReferenceBundle.message("tab.all_references"), scrollPane);
+        // Use ToolbarDecorator for nice border and actions (though we disable most defaults)
+        ToolbarDecorator decorator = ToolbarDecorator.createDecorator(referenceList)
+                .disableAddAction()
+                .disableRemoveAction()
+                .disableUpDownActions();
+        
+        tabbedPane.addTab(ReferenceBundle.message("tab.all_references"), decorator.createPanel());
     }
 
     private void setupTreeView() {
@@ -219,10 +253,12 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
                     
                     if (userObject instanceof String) {
                         // Category node
+                        setIcon(AllIcons.Nodes.Folder);
                         append((String) userObject, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
                         append(" (" + node.getChildCount() + ")", SimpleTextAttributes.GRAYED_ATTRIBUTES);
                     } else if (userObject instanceof ReferenceItem) {
                         // Reference item node
+                        setIcon(AllIcons.Nodes.Variable);
                         ReferenceItem item = (ReferenceItem) userObject;
                         append(item.getCode(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
                         append(" - " + item.getDescription(), SimpleTextAttributes.GRAY_ATTRIBUTES);
@@ -236,21 +272,35 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         // Double-click to insert
         categoryTree.addMouseListener(treeMouseListener);
         
-        JBScrollPane scrollPane = new JBScrollPane(categoryTree);
-        tabbedPane.addTab(ReferenceBundle.message("tab.by_category"), scrollPane);
+        ToolbarDecorator decorator = ToolbarDecorator.createDecorator(categoryTree)
+                .disableAddAction()
+                .disableRemoveAction()
+                .disableUpDownActions();
+        
+        tabbedPane.addTab(ReferenceBundle.message("tab.by_category"), decorator.createPanel());
     }
 
     private JPanel createDetailsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(JBUI.Borders.empty(5));
         
-        detailsArea.setEditable(false);
-        detailsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        detailsArea.setLineWrap(true);
-        detailsArea.setWrapStyleWord(true);
+        // Header for details
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBorder(JBUI.Borders.empty(5));
+        headerPanel.add(new JLabel("Details"), BorderLayout.WEST);
         
-        JBScrollPane scrollPane = new JBScrollPane(detailsArea);
-        panel.add(scrollPane, BorderLayout.CENTER);
+        // Copy button
+        JButton copyButton = new JButton("Copy Code");
+        copyButton.setIcon(AllIcons.Actions.Copy);
+        copyButton.addActionListener(e -> {
+            if (currentSelectedItem != null) {
+                StringSelection selection = new StringSelection(currentSelectedItem.getCode());
+                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+            }
+        });
+        headerPanel.add(copyButton, BorderLayout.EAST);
+        
+        panel.add(headerPanel, BorderLayout.NORTH);
+        panel.add(new JBScrollPane(detailsArea), BorderLayout.CENTER);
         
         return panel;
     }
@@ -386,22 +436,32 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
                 updateDetails((ReferenceItem) node.getUserObject());
             } else {
                 detailsArea.setText("");
+                currentSelectedItem = null;
             }
         }
     }
 
     private void updateDetails(ReferenceItem item) {
+        currentSelectedItem = item;
         if (item != null) {
-            StringBuilder details = new StringBuilder();
-            details.append("Code: ").append(item.getCode()).append("\n\n");
-            details.append("Description: ").append(item.getDescription()).append("\n\n");
+            StringBuilder html = new StringBuilder("<html><body style='font-family: sans-serif;'>");
+            html.append("<h2>").append(item.getCode()).append("</h2>");
+            html.append("<p><b>Description:</b> ").append(item.getDescription()).append("</p>");
+            
             if (item.getCategory() != null) {
-                details.append("Category: ").append(item.getCategory()).append("\n\n");
+                html.append("<p><b>Category:</b> ").append(item.getCategory()).append("</p>");
             }
+            
             if (item.getTags() != null && !item.getTags().isEmpty()) {
-                details.append("Tags: ").append(String.join(", ", item.getTags())).append("\n");
+                html.append("<p><b>Tags:</b> ");
+                for (String tag : item.getTags()) {
+                    html.append("<span style='background-color: #e0e0e0; color: #333; padding: 2px 4px; border-radius: 3px;'>").append(tag).append("</span> ");
+                }
+                html.append("</p>");
             }
-            detailsArea.setText(details.toString());
+            html.append("</body></html>");
+            
+            detailsArea.setText(html.toString());
             detailsArea.setCaretPosition(0);
         } else {
             detailsArea.setText("");
