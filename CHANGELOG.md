@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.2] - 2025-11-24
+
+### Fixed
+- **Compatibility**: Removed upper version limit (`until-build`) to support IntelliJ IDEA 2024.3 and upcoming 2025.x releases.
+
 ## [2.2.1] - 2025-11-24
 
 ### Fixed

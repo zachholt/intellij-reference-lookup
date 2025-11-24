@@ -3,7 +3,7 @@ import java.util.Properties
 
 plugins {
     id("java")
-    id("org.jetbrains.intellij.platform") version "2.1.0"
+    id("org.jetbrains.intellij.platform") version "2.2.1"
 }
 
 group = "com.zachholt"
@@ -76,7 +76,6 @@ intellijPlatform {
         
         ideaVersion {
             sinceBuild = "243"
-            untilBuild = "243.*"
         }
     }
     
