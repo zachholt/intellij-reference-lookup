@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [2.5.2] - 2025-11-26
+
+### Changed
+- **Java-only**: Removed JSON file support, now exclusively uses Java reference files.
+- **Simpler Settings**: Settings page now shows only the Java file selector.
+
+### Removed
+- JSON file path setting and preference toggle.
+- Bundled sample references.json resource file.
+
 ## [2.5.1] - 2025-11-26
 
 ### Changed
