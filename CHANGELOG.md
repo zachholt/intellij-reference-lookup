@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [2.5.1] - 2025-11-26
+
+### Changed
+- **Simplified UI**: Removed "By Category" tab for a cleaner, single-list interface.
+- **Streamlined Details**: Removed "Copy Code" button from details panel.
+- **Reduced Complexity**: Cleaned up ~240 lines of unused code for better maintainability.
+
 ## [2.5.0] - 2025-11-26
 
 ### Performance
