@@ -66,6 +66,9 @@ jobs:
           ./gradlew getChangelog --no-header --quiet --console=plain --output-file=$RELEASE_NOTE
           echo "notes_file=$RELEASE_NOTE" >> $GITHUB_OUTPUT
 
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
       - name: Create Tag and Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,9 +82,10 @@ jobs:
           git tag -a "$TAG" -m "Release ${{ inputs.version }}"
           git push origin "$TAG"
 
-          echo "Creating GitHub release..."
+          echo "Creating GitHub release with plugin artifact..."
           gh release create "$TAG" \
             --title "${{ inputs.version }}" \
-            --notes-file "${{ steps.changelog.outputs.notes_file }}"
+            --notes-file "${{ steps.changelog.outputs.notes_file }}" \
+            ./build/distributions/reference-lookup-${{ inputs.version }}.zip
 
-          echo "✅ Release ${{ inputs.version }} created! The Release workflow will now publish to JetBrains Marketplace."
+          echo "✅ Release ${{ inputs.version }} created with plugin artifact attached!"
