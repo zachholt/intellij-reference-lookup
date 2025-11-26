@@ -14,9 +14,7 @@ import org.jetbrains.annotations.Nullable;
 )
 public class ReferenceSettingsState implements PersistentStateComponent<ReferenceSettingsState> {
 
-    public String referenceFilePath = System.getProperty("user.home") + "/.reference-lookup/Reference.java";
-    public boolean useJsonFile = false;
-    public String jsonFilePath = System.getProperty("user.home") + "/.reference-lookup/references.json";
+    public String referenceFilePath = "";
 
     public static ReferenceSettingsState getInstance() {
         return ApplicationManager.getApplication().getService(ReferenceSettingsState.class);

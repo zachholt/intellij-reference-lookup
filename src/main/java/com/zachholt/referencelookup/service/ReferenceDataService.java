@@ -1,7 +1,5 @@
 package com.zachholt.referencelookup.service;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
@@ -15,9 +13,6 @@ import com.zachholt.referencelookup.parser.JavaConstantParser;
 import com.zachholt.referencelookup.parser.PsiConstantParser;
 import com.zachholt.referencelookup.settings.ReferenceSettingsState;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,18 +30,14 @@ import java.util.regex.Pattern;
 public final class ReferenceDataService {
     private static final Logger LOG = Logger.getInstance(ReferenceDataService.class);
 
-    // Static Gson instance - thread-safe and reusable
-    private static final Gson GSON = new Gson();
     // Pre-compiled pattern for code splitting
     private static final Pattern CODE_SPLIT_PATTERN = Pattern.compile("[\\s_-]");
 
     private final List<ReferenceItem> references = new ArrayList<>();
-    // Code index for exact matches
     private final Map<String, List<ReferenceItem>> codeIndex = new HashMap<>();
-    // Note: Lowercase caches are now embedded in ReferenceItem via lazy getters (getCodeLower(), etc.)
-    
+
     private final Project project;
-    
+
     private volatile boolean isLoaded = false;
     private volatile boolean isLoading = false;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -72,69 +63,31 @@ public final class ReferenceDataService {
      * Use onLoaded() to be notified when loading completes.
      */
     public void loadReferencesAsync() {
-        // Fast path: already loaded
         if (isLoaded) return;
 
-        // Prevent multiple threads from starting the load
         synchronized (this) {
             if (isLoading || isLoaded) return;
             isLoading = true;
         }
 
-        // Run file I/O on background thread to avoid blocking UI
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             long startTime = System.currentTimeMillis();
             try {
                 LOG.info("Starting background load of references...");
-                
+
                 List<ReferenceItem> loadedItems = new ArrayList<>();
                 ReferenceSettingsState settings = ReferenceSettingsState.getInstance();
-                
-                boolean loaded = false;
 
-                // 1. Check preferred JSON if enabled
-                if (settings.useJsonFile && settings.jsonFilePath != null && !settings.jsonFilePath.isEmpty()) {
-                    Path jsonPath = Paths.get(settings.jsonFilePath);
-                    if (Files.exists(jsonPath)) {
-                        LOG.info("Loading references from JSON: " + jsonPath);
-                        List<ReferenceItem> items = loadFromJsonFile(jsonPath);
-                        if (!items.isEmpty()) {
-                            loadedItems.addAll(items);
-                            loaded = true;
-                        }
-                    }
-                }
-
-                // 2. Check Java file (if not loaded or not preferred JSON)
-                if (!loaded && settings.referenceFilePath != null && !settings.referenceFilePath.isEmpty()) {
-                     Path javaPath = Paths.get(settings.referenceFilePath);
-                     if (Files.exists(javaPath)) {
+                if (settings.referenceFilePath != null && !settings.referenceFilePath.isEmpty()) {
+                    Path javaPath = Paths.get(settings.referenceFilePath);
+                    if (Files.exists(javaPath)) {
                         LOG.info("Loading references from Java: " + javaPath);
-                        List<ReferenceItem> items = loadFromJavaFile(javaPath);
-                        if (!items.isEmpty()) {
-                            loadedItems.addAll(items);
-                            loaded = true;
-                        }
-                     }
-                }
-                
-                // 3. Check JSON as fallback (if JSON was not preferred/checked or Java failed)
-                if (!loaded && !settings.useJsonFile && settings.jsonFilePath != null && !settings.jsonFilePath.isEmpty()) {
-                    Path jsonPath = Paths.get(settings.jsonFilePath);
-                     if (Files.exists(jsonPath)) {
-                        LOG.info("Loading references from JSON (fallback): " + jsonPath);
-                        List<ReferenceItem> items = loadFromJsonFile(jsonPath);
-                        if (!items.isEmpty()) {
-                            loadedItems.addAll(items);
-                            loaded = true;
-                        }
-                     }
-                }
-
-                // 4. Resources Fallback
-                if (!loaded) {
-                    LOG.info("Loading default references from resources");
-                    loadedItems.addAll(loadFromResources());
+                        loadedItems.addAll(loadFromJavaFile(javaPath));
+                    } else {
+                        LOG.warn("Reference file not found: " + javaPath);
+                    }
+                } else {
+                    LOG.info("No reference file configured in settings");
                 }
 
                 lock.writeLock().lock();
@@ -155,7 +108,6 @@ public final class ReferenceDataService {
                 LOG.error("Failed to load references (took " + (System.currentTimeMillis() - startTime) + "ms)", e);
             } finally {
                 isLoading = false;
-                // Notify listeners regardless of success/failure to prevent them from waiting forever
                 notifyLoadListeners();
             }
         });
@@ -198,13 +150,12 @@ public final class ReferenceDataService {
         try {
             // Try PSI parsing first (much more robust)
             final List<ReferenceItem> items = new ArrayList<>();
-            
+
             ApplicationManager.getApplication().runReadAction(() -> {
                 VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByNioFile(path);
                 if (virtualFile != null) {
-                    // Check if the project is disposed before accessing PSI
                     if (project.isDisposed()) return;
-                    
+
                     PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
                     if (psiFile != null) {
                         PsiConstantParser parser = new PsiConstantParser();
@@ -212,7 +163,7 @@ public final class ReferenceDataService {
                     }
                 }
             });
-            
+
             if (!items.isEmpty()) {
                 LOG.info("Successfully parsed via PSI: " + path);
                 return items;
@@ -220,7 +171,7 @@ public final class ReferenceDataService {
         } catch (Exception e) {
             LOG.warn("Failed to parse Java file via PSI: " + path, e);
         }
-        
+
         // Fallback to regex parser
         try {
             LOG.info("Falling back to Regex parser for: " + path);
@@ -235,34 +186,6 @@ public final class ReferenceDataService {
         return Collections.emptyList();
     }
 
-    private List<ReferenceItem> loadFromJsonFile(Path path) {
-        try (InputStreamReader reader = new InputStreamReader(Files.newInputStream(path))) {
-            Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
-            List<ReferenceItem> loaded = GSON.fromJson(reader, listType);
-            return loaded != null ? loaded : Collections.emptyList();
-        } catch (Exception e) {
-            LOG.warn("Failed to parse JSON file: " + path, e);
-            return Collections.emptyList();
-        }
-    }
-
-    private List<ReferenceItem> loadFromResources() {
-        InputStream resourceStream = getClass().getResourceAsStream("/references.json");
-        if (resourceStream == null) {
-            LOG.error("Could not find references.json in resources");
-            return Collections.emptyList();
-        }
-        
-        try (InputStreamReader reader = new InputStreamReader(resourceStream)) {
-            Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
-            List<ReferenceItem> loaded = GSON.fromJson(reader, listType);
-            return loaded != null ? loaded : Collections.emptyList();
-        } catch (Exception e) {
-            LOG.error("Failed to parse resources JSON", e);
-            return Collections.emptyList();
-        }
-    }
-
     private void buildIndex() {
         codeIndex.clear();
 
@@ -272,16 +195,13 @@ public final class ReferenceDataService {
                 continue;
             }
 
-            // Index by full code (lowercase)
             codeIndex.computeIfAbsent(codeLower, k -> new ArrayList<>()).add(item);
 
-            // Index by value (exact match, lowercase)
             String valueLower = item.getValueLower();
             if (valueLower != null && !valueLower.isEmpty()) {
                 codeIndex.computeIfAbsent(valueLower, k -> new ArrayList<>()).add(item);
             }
 
-            // Index by code parts (for partial matches)
             String[] parts = CODE_SPLIT_PATTERN.split(codeLower);
             for (String part : parts) {
                 if (!part.isEmpty()) {
@@ -292,18 +212,16 @@ public final class ReferenceDataService {
     }
 
     public List<ReferenceItem> search(String query) {
-        return search(query, -1); // No limit
+        return search(query, -1);
     }
 
     public List<ReferenceItem> search(String query, int limit) {
-        // Trigger load if not started
         loadReferencesAsync();
 
         if (query == null || query.trim().isEmpty()) {
             return Collections.emptyList();
         }
 
-        // If not loaded, we can't search synchronously. Return empty.
         if (!isLoaded) {
             return Collections.emptyList();
         }
@@ -319,12 +237,12 @@ public final class ReferenceDataService {
             if (exactMatches != null) {
                 results.addAll(exactMatches);
             }
-            
+
             if (limit > 0 && results.size() >= limit) {
                 return new ArrayList<>(results).subList(0, limit);
             }
 
-            // 2. Contains match (fast) - uses lazy-cached lowercase getters
+            // 2. Contains match
             for (ReferenceItem item : references) {
                 String codeLower = item.getCodeLower();
                 String descriptionLower = item.getDescriptionLower();
@@ -342,10 +260,9 @@ public final class ReferenceDataService {
                 return new ArrayList<>(results);
             }
 
-            // 3. Fuzzy subsequence match (slower) - only if we need more results
-            // Skipping this if we have enough matches to save CPU
+            // 3. Fuzzy match (only if no results yet)
             if (results.isEmpty()) {
-                 for (ReferenceItem item : references) {
+                for (ReferenceItem item : references) {
                     String codeLower = item.getCodeLower();
                     if (codeLower != null && fuzzyMatch(normalizedQuery, codeLower)) {
                         results.add(item);
@@ -364,15 +281,12 @@ public final class ReferenceDataService {
         }
     }
 
-    /**
-     * Checks if all characters of query appear in order in target.
-     */
     private boolean fuzzyMatch(String query, String target) {
         int queryIdx = 0;
         int targetIdx = 0;
         int queryLen = query.length();
         int targetLen = target.length();
-        
+
         while (queryIdx < queryLen && targetIdx < targetLen) {
             if (query.charAt(queryIdx) == target.charAt(targetIdx)) {
                 queryIdx++;
