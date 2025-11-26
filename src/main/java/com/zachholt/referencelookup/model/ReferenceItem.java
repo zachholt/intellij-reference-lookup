@@ -9,6 +9,12 @@ public class ReferenceItem {
     private String category;
     private List<String> tags;
 
+    // Transient cached lowercase values for efficient searching
+    // Not serialized by Gson, lazily initialized on first access
+    private transient String codeLower;
+    private transient String descriptionLower;
+    private transient String valueLower;
+
     public ReferenceItem() {
     }
 
@@ -63,6 +69,39 @@ public class ReferenceItem {
 
     public void setTags(List<String> tags) {
         this.tags = tags;
+    }
+
+    /**
+     * Returns lowercase code for efficient case-insensitive searching.
+     * Lazily cached to avoid repeated String allocations.
+     */
+    public String getCodeLower() {
+        if (codeLower == null && code != null) {
+            codeLower = code.toLowerCase();
+        }
+        return codeLower;
+    }
+
+    /**
+     * Returns lowercase description for efficient case-insensitive searching.
+     * Lazily cached to avoid repeated String allocations.
+     */
+    public String getDescriptionLower() {
+        if (descriptionLower == null && description != null) {
+            descriptionLower = description.toLowerCase();
+        }
+        return descriptionLower;
+    }
+
+    /**
+     * Returns lowercase value for efficient case-insensitive searching.
+     * Lazily cached to avoid repeated String allocations.
+     */
+    public String getValueLower() {
+        if (valueLower == null && value != null) {
+            valueLower = value.toLowerCase();
+        }
+        return valueLower;
     }
 
     @Override

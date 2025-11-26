@@ -293,8 +293,12 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         copyButton.setIcon(AllIcons.Actions.Copy);
         copyButton.addActionListener(e -> {
             if (currentSelectedItem != null) {
-                StringSelection selection = new StringSelection(currentSelectedItem.getCode());
-                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+                final String codeToCopy = currentSelectedItem.getCode();
+                // Move clipboard operation to background thread to avoid potential EDT blocking
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    StringSelection selection = new StringSelection(codeToCopy);
+                    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+                });
             }
         });
         headerPanel.add(copyButton, BorderLayout.EAST);
@@ -349,14 +353,11 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
             rootNode.add(categoryNode);
         }
         
-        treeModel.reload();
+        // Use nodeStructureChanged instead of reload() for better performance
+        treeModel.nodeStructureChanged(rootNode);
 
-        // Only expand if there are a reasonable number of rows (avoid performance hit)
-        if (categoryTree.getRowCount() <= 50) {
-            for (int i = 0; i < categoryTree.getRowCount(); i++) {
-                categoryTree.expandRow(i);
-            }
-        }
+        // Expand tree categories in batches to avoid blocking EDT
+        expandTreeInBatches();
     }
 
     // Debounced filter - only runs search after user stops typing for 300ms
@@ -413,13 +414,47 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
             rootNode.add(categoryNode);
         }
 
-        treeModel.reload();
+        // Use nodeStructureChanged instead of reload() for better performance
+        treeModel.nodeStructureChanged(rootNode);
 
-        // Only expand if there are a reasonable number of rows (avoid performance hit)
-        if (categoryTree.getRowCount() <= 50) {
-            for (int i = 0; i < categoryTree.getRowCount(); i++) {
+        // Expand tree categories in batches to avoid blocking EDT
+        expandTreeInBatches();
+    }
+
+    /**
+     * Expands tree rows in batches to avoid blocking EDT.
+     * Expands a few rows at a time, yielding between batches.
+     */
+    private void expandTreeInBatches() {
+        int rowCount = categoryTree.getRowCount();
+        if (rowCount > 50) {
+            return; // Too many rows - don't auto-expand
+        }
+
+        final int BATCH_SIZE = 10;
+        expandRowBatch(0, rowCount, BATCH_SIZE);
+    }
+
+    private void expandRowBatch(int startRow, int totalRows, int batchSize) {
+        if (startRow >= totalRows) {
+            return; // Done expanding
+        }
+
+        // Expand this batch
+        int endRow = Math.min(startRow + batchSize, totalRows);
+        for (int i = startRow; i < endRow; i++) {
+            if (i < categoryTree.getRowCount()) {
                 categoryTree.expandRow(i);
             }
+        }
+
+        // Schedule next batch to allow EDT to process other events
+        if (endRow < totalRows) {
+            SwingUtilities.invokeLater(() -> {
+                // Re-check row count as it may have changed
+                int currentRowCount = categoryTree.getRowCount();
+                expandRowBatch(endRow, Math.min(totalRows, currentRowCount + batchSize), batchSize);
+            });
         }
     }
 
@@ -441,29 +476,40 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
         }
     }
 
+    /**
+     * Escapes HTML special characters to prevent rendering issues and XSS-like display bugs.
+     */
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;");
+    }
+
     private void updateDetails(ReferenceItem item) {
         currentSelectedItem = item;
         if (item != null) {
             StringBuilder html = new StringBuilder("<html><body style='font-family: sans-serif;'>");
-            html.append("<h2>").append(item.getCode()).append("</h2>");
+            html.append("<h2>").append(escapeHtml(item.getCode())).append("</h2>");
             if (item.getValue() != null && !item.getValue().isEmpty()) {
-                html.append("<p><b>Value:</b> ").append(item.getValue()).append("</p>");
+                html.append("<p><b>Value:</b> ").append(escapeHtml(item.getValue())).append("</p>");
             }
-            html.append("<p><b>Description:</b> ").append(item.getDescription()).append("</p>");
-            
+            html.append("<p><b>Description:</b> ").append(escapeHtml(item.getDescription())).append("</p>");
+
             if (item.getCategory() != null) {
-                html.append("<p><b>Category:</b> ").append(item.getCategory()).append("</p>");
+                html.append("<p><b>Category:</b> ").append(escapeHtml(item.getCategory())).append("</p>");
             }
-            
+
             if (item.getTags() != null && !item.getTags().isEmpty()) {
                 html.append("<p><b>Tags:</b> ");
                 for (String tag : item.getTags()) {
-                    html.append("<span style='background-color: #e0e0e0; color: #333; padding: 2px 4px; border-radius: 3px;'>").append(tag).append("</span> ");
+                    html.append("<span style='background-color: #e0e0e0; color: #333; padding: 2px 4px; border-radius: 3px;'>").append(escapeHtml(tag)).append("</span> ");
                 }
                 html.append("</p>");
             }
             html.append("</body></html>");
-            
+
             detailsArea.setText(html.toString());
             detailsArea.setCaretPosition(0);
         } else {

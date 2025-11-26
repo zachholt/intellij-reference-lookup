@@ -3,7 +3,7 @@ package com.example.reference;
 public class Reference {
     
     // HTTP Status Codes
-    /** OK - The request has succeeded */
+    /** OK - The request has succeeded (200) */
     public static final int HTTP_OK = 200;
     
     /** Created - The request has been fulfilled and resulted in a new resource being created */

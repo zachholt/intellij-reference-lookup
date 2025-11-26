@@ -21,24 +21,33 @@ import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Pattern;
 
 @Service(Service.Level.PROJECT)
 public final class ReferenceDataService {
     private static final Logger LOG = Logger.getInstance(ReferenceDataService.class);
-    
+
+    // Static Gson instance - thread-safe and reusable
+    private static final Gson GSON = new Gson();
+    // Pre-compiled pattern for code splitting
+    private static final Pattern CODE_SPLIT_PATTERN = Pattern.compile("[\\s_-]");
+
     // Use more memory-efficient collections if possible, but ArrayList is fine for lists.
     private final List<ReferenceItem> references = new ArrayList<>();
     // Cache for the grouped view to avoid rebuilding it
     private final Map<String, List<ReferenceItem>> cachedGroupedReferences = new ConcurrentHashMap<>();
     // Code index for exact matches
     private final Map<String, List<ReferenceItem>> codeIndex = new HashMap<>();
-    // Cached lowercase values to avoid repeated allocations during search
-    private final Map<ReferenceItem, String> codeLowerCache = new IdentityHashMap<>();
-    private final Map<ReferenceItem, String> descriptionLowerCache = new IdentityHashMap<>();
-    private final Map<ReferenceItem, String> valueLowerCache = new IdentityHashMap<>();
+    // Note: Lowercase caches are now embedded in ReferenceItem via lazy getters (getCodeLower(), etc.)
     
     private final Project project;
     
@@ -232,9 +241,8 @@ public final class ReferenceDataService {
 
     private List<ReferenceItem> loadFromJsonFile(Path path) {
         try (InputStreamReader reader = new InputStreamReader(Files.newInputStream(path))) {
-            Gson gson = new Gson();
             Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
-            List<ReferenceItem> loaded = gson.fromJson(reader, listType);
+            List<ReferenceItem> loaded = GSON.fromJson(reader, listType);
             return loaded != null ? loaded : Collections.emptyList();
         } catch (Exception e) {
             LOG.warn("Failed to parse JSON file: " + path, e);
@@ -250,9 +258,8 @@ public final class ReferenceDataService {
         }
         
         try (InputStreamReader reader = new InputStreamReader(resourceStream)) {
-            Gson gson = new Gson();
             Type listType = new TypeToken<List<ReferenceItem>>(){}.getType();
-            List<ReferenceItem> loaded = gson.fromJson(reader, listType);
+            List<ReferenceItem> loaded = GSON.fromJson(reader, listType);
             return loaded != null ? loaded : Collections.emptyList();
         } catch (Exception e) {
             LOG.error("Failed to parse resources JSON", e);
@@ -263,38 +270,25 @@ public final class ReferenceDataService {
     private void buildIndex() {
         codeIndex.clear();
         cachedGroupedReferences.clear();
-        codeLowerCache.clear();
-        descriptionLowerCache.clear();
-        valueLowerCache.clear();
-        
+        // Note: Lowercase caches are now lazy-initialized in ReferenceItem
+
         for (ReferenceItem item : references) {
-            String code = item.getCode();
-            if (code == null) {
+            String codeLower = item.getCodeLower();
+            if (codeLower == null) {
                 continue;
             }
 
-            String normalizedCode = code.toLowerCase();
-            String normalizedDescription = Optional.ofNullable(item.getDescription())
-                    .map(String::toLowerCase)
-                    .orElse("");
-            String normalizedValue = Optional.ofNullable(item.getValue())
-                    .map(String::toLowerCase)
-                    .orElse("");
-                    
-            codeLowerCache.put(item, normalizedCode);
-            descriptionLowerCache.put(item, normalizedDescription);
-            valueLowerCache.put(item, normalizedValue);
-            
-            // Index by full code
-            codeIndex.computeIfAbsent(normalizedCode, k -> new ArrayList<>()).add(item);
-            
-            // Index by value (exact match)
-            if (!normalizedValue.isEmpty()) {
-                codeIndex.computeIfAbsent(normalizedValue, k -> new ArrayList<>()).add(item);
+            // Index by full code (lowercase)
+            codeIndex.computeIfAbsent(codeLower, k -> new ArrayList<>()).add(item);
+
+            // Index by value (exact match, lowercase)
+            String valueLower = item.getValueLower();
+            if (valueLower != null && !valueLower.isEmpty()) {
+                codeIndex.computeIfAbsent(valueLower, k -> new ArrayList<>()).add(item);
             }
-            
+
             // Index by code parts (for partial matches)
-            String[] parts = normalizedCode.split("[\\s_-]");
+            String[] parts = CODE_SPLIT_PATTERN.split(codeLower);
             for (String part : parts) {
                 if (!part.isEmpty()) {
                     codeIndex.computeIfAbsent(part, k -> new ArrayList<>()).add(item);
@@ -340,20 +334,20 @@ public final class ReferenceDataService {
                 return new ArrayList<>(results).subList(0, limit);
             }
 
-            // 2. Contains match (fast)
+            // 2. Contains match (fast) - uses lazy-cached lowercase getters
             for (ReferenceItem item : references) {
-                String codeLower = codeLowerCache.getOrDefault(item, "");
-                String descriptionLower = descriptionLowerCache.getOrDefault(item, "");
-                String valueLower = valueLowerCache.getOrDefault(item, "");
+                String codeLower = item.getCodeLower();
+                String descriptionLower = item.getDescriptionLower();
+                String valueLower = item.getValueLower();
 
-                if (codeLower.contains(normalizedQuery) ||
-                    descriptionLower.contains(normalizedQuery) ||
-                    valueLower.contains(normalizedQuery)) {
+                if ((codeLower != null && codeLower.contains(normalizedQuery)) ||
+                    (descriptionLower != null && descriptionLower.contains(normalizedQuery)) ||
+                    (valueLower != null && valueLower.contains(normalizedQuery))) {
                     results.add(item);
                     if (limit > 0 && results.size() >= limit) break;
                 }
             }
-            
+
             if (limit > 0 && results.size() >= limit) {
                 return new ArrayList<>(results);
             }
@@ -362,7 +356,8 @@ public final class ReferenceDataService {
             // Skipping this if we have enough matches to save CPU
             if (results.isEmpty()) {
                  for (ReferenceItem item : references) {
-                    if (fuzzyMatch(normalizedQuery, item.getCode().toLowerCase())) {
+                    String codeLower = item.getCodeLower();
+                    if (codeLower != null && fuzzyMatch(normalizedQuery, codeLower)) {
                         results.add(item);
                         if (limit > 0 && results.size() >= limit) break;
                     }
@@ -403,7 +398,7 @@ public final class ReferenceDataService {
 
         lock.readLock().lock();
         try {
-            return new ArrayList<>(references);
+            return Collections.unmodifiableList(references);
         } finally {
             lock.readLock().unlock();
         }
@@ -415,8 +410,8 @@ public final class ReferenceDataService {
 
         lock.readLock().lock();
         try {
-            // Return the cached map
-            return new HashMap<>(cachedGroupedReferences);
+            // Return unmodifiable view of the cached map
+            return Collections.unmodifiableMap(cachedGroupedReferences);
         } finally {
             lock.readLock().unlock();
         }

@@ -1,10 +1,12 @@
 package com.zachholt.referencelookup;
 
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.content.Content;
@@ -18,133 +20,195 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class QuickLookupAction extends ActionGroup implements DumbAware {
-    
+
+    // Cache for pre-computed search results to avoid EDT blocking
+    private static final Key<CachedSearchResult> CACHED_RESULT_KEY = Key.create("QuickLookupAction.CachedResult");
+
+    // Cache validity period (5 seconds)
+    private static final long CACHE_VALIDITY_MS = 5000;
+
+    /**
+     * Holds cached search results with query and timestamp for validation.
+     */
+    private static class CachedSearchResult {
+        final String query;
+        final List<ReferenceItem> results;
+        final long timestamp;
+
+        CachedSearchResult(String query, List<ReferenceItem> results) {
+            this.query = query;
+            this.results = results;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        boolean isValid(String currentQuery) {
+            return query != null && query.equals(currentQuery)
+                && (System.currentTimeMillis() - timestamp) < CACHE_VALIDITY_MS;
+        }
+    }
+
     public QuickLookupAction() {
         super("Reference Lookup", true);
     }
-    
+
     @Override
     public void update(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
-        
+
         boolean enabled = project != null && editor != null && editor.getSelectionModel().hasSelection();
         e.getPresentation().setEnabledAndVisible(enabled);
-        
+
         if (enabled) {
             String selectedText = editor.getSelectionModel().getSelectedText();
             if (selectedText != null && selectedText.trim().length() <= 50) {
                 e.getPresentation().setText("Lookup '" + selectedText.trim() + "'");
+
+                // Pre-compute search results in background during update()
+                // This keeps the cache warm so getChildren() doesn't block
+                precomputeSearchResults(project, selectedText.trim());
             } else {
                 e.getPresentation().setText("Reference Lookup");
             }
         }
     }
+
+    /**
+     * Pre-computes search results on a background thread and stores in project cache.
+     * Called from update() to keep the cache warm before getChildren() is invoked.
+     */
+    private void precomputeSearchResults(Project project, String query) {
+        ReferenceDataService service = ReferenceDataService.getInstance(project);
+        if (!service.isLoaded()) {
+            service.loadReferencesAsync();
+            return;
+        }
+
+        CachedSearchResult cached = project.getUserData(CACHED_RESULT_KEY);
+        if (cached != null && cached.isValid(query)) {
+            return; // Already have valid cached results
+        }
+
+        // Run search in background thread
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (project.isDisposed()) return;
+
+            List<ReferenceItem> results = service.search(query, 11);
+
+            // Store in project-level cache (thread-safe via Key mechanism)
+            project.putUserData(CACHED_RESULT_KEY, new CachedSearchResult(query, results));
+        });
+    }
     
     @Override
     public AnAction @NotNull [] getChildren(@Nullable AnActionEvent e) {
         if (e == null) return EMPTY_ARRAY;
-        
+
         Project project = e.getProject();
         Editor editor = e.getData(CommonDataKeys.EDITOR);
-        
+
         if (project == null || editor == null) return EMPTY_ARRAY;
-        
+
         SelectionModel selectionModel = editor.getSelectionModel();
         String selectedText = selectionModel.getSelectedText();
-        
+
         if (selectedText == null || selectedText.trim().isEmpty()) return EMPTY_ARRAY;
-        
+
+        String query = selectedText.trim();
         List<AnAction> actions = new ArrayList<>();
-        
+
         ReferenceDataService service = ReferenceDataService.getInstance(project);
-        
+
         if (!service.isLoaded()) {
             service.loadReferencesAsync();
-            actions.add(new AnAction("Loading references...") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e) {
-                    // Do nothing
-                }
-                
-                @Override
-                public void update(@NotNull AnActionEvent e) {
-                    e.getPresentation().setEnabled(false);
-                }
-            });
-             actions.add(new AnAction("Open Reference Browser") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e) {
-                    Project project = e.getProject();
-                    if (project != null) {
-                        com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
-                                .getToolWindow("ReferenceBrowser")
-                                .show();
-                    }
-                }
-            });
+            actions.add(createDisabledAction("Loading references..."));
+            actions.add(createOpenBrowserAction());
             return actions.toArray(new AnAction[0]);
         }
 
-        // Search for matches first
-        List<ReferenceItem> matches = service.search(selectedText.trim(), 11);
-        
-        if (!matches.isEmpty()) {
-            // Add quick results (limit to first 10)
-            int count = Math.min(matches.size(), 5);
-            for (int i = 0; i < count; i++) {
-                ReferenceItem item = matches.get(i);
-                actions.add(new QuickValueAction(item));
-            }
-            
-            if (matches.size() > count) {
-                actions.add(Separator.getInstance());
-                actions.add(new AnAction("... and " + (matches.size() - count) + " more (Open Reference Browser)") {
-                    @Override
-                    public void actionPerformed(@NotNull AnActionEvent e) {
-                        openToolWindowWithSelection(e, selectedText);
-                    }
-                });
-            }
-            
-            // Always add search option at the end
-            actions.add(Separator.getInstance());
-            // Removed - we'll just use the Open Reference Browser option below
-            
-            // Add option to open reference browser
-            actions.add(new AnAction("Open Reference Browser") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e) {
-                    openToolWindowWithSelection(e, selectedText);
-                }
-            });
+        // Use cached results - NO blocking search on EDT!
+        CachedSearchResult cached = project.getUserData(CACHED_RESULT_KEY);
+        List<ReferenceItem> matches;
+
+        if (cached != null && cached.isValid(query)) {
+            matches = cached.results;
         } else {
-            actions.add(new AnAction("No matches found") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e) {
-                    // Do nothing
-                }
-                
-                @Override
-                public void update(@NotNull AnActionEvent e) {
-                    e.getPresentation().setEnabled(false);
-                }
-            });
-            
-            // Still add search option
-            actions.add(Separator.getInstance());
-            // Removed - we'll just use the Open Reference Browser option below
-            
-            // Add option to open reference browser
-            actions.add(new AnAction("Open Reference Browser") {
-                @Override
-                public void actionPerformed(@NotNull AnActionEvent e) {
-                    openToolWindowWithSelection(e, selectedText);
-                }
-            });
+            // Cache miss - show "Searching..." and trigger background search
+            precomputeSearchResults(project, query);
+            actions.add(createDisabledAction("Searching..."));
+            actions.add(createOpenBrowserAction(query));
+            return actions.toArray(new AnAction[0]);
         }
         
+        // Build menu from cached results (fast, no blocking)
+        if (!matches.isEmpty()) {
+            int count = Math.min(matches.size(), 5);
+            for (int i = 0; i < count; i++) {
+                actions.add(new QuickValueAction(matches.get(i)));
+            }
+
+            if (matches.size() > count) {
+                actions.add(Separator.getInstance());
+                actions.add(createMoreResultsAction(matches.size() - count, query));
+            }
+
+            actions.add(Separator.getInstance());
+            actions.add(createOpenBrowserAction(query));
+        } else {
+            actions.add(createDisabledAction("No matches found"));
+            actions.add(Separator.getInstance());
+            actions.add(createOpenBrowserAction(query));
+        }
+
         return actions.toArray(new AnAction[0]);
+    }
+
+    /**
+     * Creates a disabled action with the given text.
+     */
+    private AnAction createDisabledAction(String text) {
+        return new AnAction(text) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                // Do nothing
+            }
+
+            @Override
+            public void update(@NotNull AnActionEvent e) {
+                e.getPresentation().setEnabled(false);
+            }
+        };
+    }
+
+    /**
+     * Creates an action to open the Reference Browser tool window.
+     */
+    private AnAction createOpenBrowserAction() {
+        return createOpenBrowserAction(null);
+    }
+
+    /**
+     * Creates an action to open the Reference Browser tool window with optional search text.
+     */
+    private AnAction createOpenBrowserAction(String searchText) {
+        return new AnAction("Open Reference Browser") {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                openToolWindowWithSelection(e, searchText);
+            }
+        };
+    }
+
+    /**
+     * Creates an action showing "... and N more" that opens the browser.
+     */
+    private AnAction createMoreResultsAction(int moreCount, String searchText) {
+        return new AnAction("... and " + moreCount + " more (Open Reference Browser)") {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                openToolWindowWithSelection(e, searchText);
+            }
+        };
     }
 
     private void openToolWindowWithSelection(AnActionEvent e, String selection) {
@@ -190,9 +254,12 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
                 desc = "No description";
             }
             
-            // IntelliJ doesn't support HTML in menu items, just return plain text
-            // The menu will auto-wrap very long text
-            return item.getCode() + " → " + desc;
+            String display = item.getCode();
+            if (item.getValue() != null && !item.getValue().isEmpty()) {
+                display += " (" + item.getValue() + ")";
+            }
+            
+            return display + " → " + desc;
         }
         
         @Override

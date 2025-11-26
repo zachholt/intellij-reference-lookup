@@ -8,8 +8,15 @@ import com.zachholt.referencelookup.model.ReferenceItem;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class PsiConstantParser {
+
+    // Pre-compiled patterns for JavaDoc cleaning - avoids regex compilation on every call
+    private static final Pattern JAVADOC_START = Pattern.compile("/\\*\\*");
+    private static final Pattern JAVADOC_END = Pattern.compile("\\*/");
+    private static final Pattern JAVADOC_LINE_PREFIX = Pattern.compile("(?m)^\\s*\\*\\s?");
+    private static final Pattern NEWLINE = Pattern.compile("\n");
 
     public List<ReferenceItem> parse(PsiFile psiFile) {
         if (!(psiFile instanceof PsiJavaFile)) {
@@ -187,12 +194,13 @@ public class PsiConstantParser {
                 return "";
             }
         
-            private String cleanJavaDoc(String text) {            if (text == null) return "";
-            return text.replaceAll("/\\*\\*", "")
-                       .replaceAll("\\*/", "")
-                       .replaceAll("(?m)^\\s*\\*\\s?", "") // Remove leading * on each line (multiline mode)
-                       .replaceAll("\n", " ") // Merge lines
-                       .trim();
+            private String cleanJavaDoc(String text) {
+            if (text == null) return "";
+            String result = JAVADOC_START.matcher(text).replaceAll("");
+            result = JAVADOC_END.matcher(result).replaceAll("");
+            result = JAVADOC_LINE_PREFIX.matcher(result).replaceAll("");
+            result = NEWLINE.matcher(result).replaceAll(" ");
+            return result.trim();
         }
     // --- Copied helper methods ---
 
