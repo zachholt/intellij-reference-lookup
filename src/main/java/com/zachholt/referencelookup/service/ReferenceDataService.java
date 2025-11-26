@@ -28,7 +28,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 
@@ -41,10 +40,7 @@ public final class ReferenceDataService {
     // Pre-compiled pattern for code splitting
     private static final Pattern CODE_SPLIT_PATTERN = Pattern.compile("[\\s_-]");
 
-    // Use more memory-efficient collections if possible, but ArrayList is fine for lists.
     private final List<ReferenceItem> references = new ArrayList<>();
-    // Cache for the grouped view to avoid rebuilding it
-    private final Map<String, List<ReferenceItem>> cachedGroupedReferences = new ConcurrentHashMap<>();
     // Code index for exact matches
     private final Map<String, List<ReferenceItem>> codeIndex = new HashMap<>();
     // Note: Lowercase caches are now embedded in ReferenceItem via lazy getters (getCodeLower(), etc.)
@@ -269,8 +265,6 @@ public final class ReferenceDataService {
 
     private void buildIndex() {
         codeIndex.clear();
-        cachedGroupedReferences.clear();
-        // Note: Lowercase caches are now lazy-initialized in ReferenceItem
 
         for (ReferenceItem item : references) {
             String codeLower = item.getCodeLower();
@@ -294,10 +288,6 @@ public final class ReferenceDataService {
                     codeIndex.computeIfAbsent(part, k -> new ArrayList<>()).add(item);
                 }
             }
-
-            // Build grouped cache
-            String category = item.getCategory() != null ? item.getCategory() : "Uncategorized";
-            cachedGroupedReferences.computeIfAbsent(category, k -> new ArrayList<>()).add(item);
         }
     }
 
@@ -399,19 +389,6 @@ public final class ReferenceDataService {
         lock.readLock().lock();
         try {
             return Collections.unmodifiableList(references);
-        } finally {
-            lock.readLock().unlock();
-        }
-    }
-
-    public Map<String, List<ReferenceItem>> getReferencesGroupedByCategory() {
-        loadReferencesAsync();
-        if (!isLoaded) return Collections.emptyMap();
-
-        lock.readLock().lock();
-        try {
-            // Return unmodifiable view of the cached map
-            return Collections.unmodifiableMap(cachedGroupedReferences);
         } finally {
             lock.readLock().unlock();
         }
