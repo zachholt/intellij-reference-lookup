@@ -18,7 +18,7 @@ Add the GitHub repository as a custom plugin source for automatic updates:
 
 1. Open IntelliJ IDEA
 2. Go to **Settings/Preferences** > **Plugins**
-3. Click the **⚙️ gear icon** > **Manage Plugin Repositories...**
+3. Click the **gear icon** > **Manage Plugin Repositories...**
 4. Click **+** and add:
    ```
    https://raw.githubusercontent.com/zachholt/intellij-reference-lookup/main/updatePlugins.xml
@@ -72,16 +72,6 @@ The plugin parses:
 - **Javadoc comments** for descriptions
 - **Categories** based on comment sections (e.g., `// HTTP Status Codes`)
 
-### Jira Integration (Optional)
-
-To use the "Create SQL from Jira Ticket" feature:
-
-1. Go to **Settings/Preferences** > **Tools** > **Reference Lookup**
-2. Configure:
-   - **Jira Base URL**: Your Jira instance URL (e.g., `https://yourcompany.atlassian.net`)
-   - **Jira Email**: Your Jira account email
-   - **Jira API Token**: Generate at [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-
 ## Usage
 
 ### Reference Browser
@@ -100,13 +90,6 @@ To use the "Create SQL from Jira Ticket" feature:
 ### Keyboard Shortcut
 
 Press `Ctrl+Shift+L` (or `Cmd+Shift+L` on macOS) to open the reference search dialog.
-
-### Create SQL from Jira
-
-1. Right-click on a folder in the Project view
-2. Select **Create SQL from Jira Ticket**
-3. Enter a Jira ticket URL or key (e.g., `PROJ-123`)
-4. A new SQL file is created with the ticket information as header comments
 
 ## Development
 
@@ -185,10 +168,9 @@ The workflow automatically:
 ```
 .
 ├── src/main/java/com/zachholt/referencelookup/
-│   ├── action/              # Action classes (Jira integration)
 │   ├── model/               # Data models
 │   ├── parser/              # Java file parsers
-│   ├── service/             # Services (data, Jira)
+│   ├── service/             # Services
 │   ├── settings/            # Plugin settings
 │   ├── ui/                  # UI components
 │   ├── LookupAction.java    # Keyboard shortcut action
