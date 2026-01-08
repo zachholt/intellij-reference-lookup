@@ -1,157 +1,81 @@
-# GitHub Actions Workflow for building and testing the plugin.
-# - Build the plugin and prepare artifact for download
-# - Run tests and upload code coverage
-# - Run Qodana code inspections
-#
-# Triggered on push to main and pull requests.
+# Optimized GitHub Actions Workflow for building and testing the plugin.
+# - Combined build + test in single job for faster execution
+# - Qodana only runs on pull requests (not every push)
 
 name: Build
 on:
-  # Trigger the workflow on pushes to only the 'main' branch (this avoids duplicate checks being run e.g., for dependabot pull requests)
   push:
     branches: [ main ]
-  # Trigger the workflow on any pull request
   pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-  
-jobs:
 
-  # Prepare the environment and build the plugin
-  build:
-    name: Build
+jobs:
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      # Check out the current repository
       - name: Fetch Sources
         uses: actions/checkout@v4
 
-      # Set up the Java environment for the next steps
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: 21
 
-      # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Build plugin
-      - name: Build plugin
-        run: ./gradlew buildPlugin
+      - name: Build and Test
+        run: ./gradlew buildPlugin check
 
-      # Prepare plugin archive content for creating artifact
       - name: Prepare Plugin Artifact
         id: artifact
         shell: bash
         run: |
           cd ${{ github.workspace }}/build/distributions
-          FILENAME=`ls *.zip`
+          FILENAME=$(ls *.zip)
           unzip "$FILENAME" -d content
-
           echo "filename=${FILENAME:0:-4}" >> $GITHUB_OUTPUT
 
-      # Store an already-built plugin as an artifact for downloading
-      - name: Upload artifact
+      - name: Upload Plugin Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact.outputs.filename }}
           path: ./build/distributions/content/*/*
 
-  # Run tests and upload a code coverage report
-  test:
-    name: Test
-    needs: [ build ]
-    runs-on: ubuntu-latest
-    steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      # Check out the current repository
-      - name: Fetch Sources
-        uses: actions/checkout@v4
-
-      # Set up the Java environment for the next steps
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: 21
-
-      # Setup Gradle
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: true
-
-      # Run tests
-      - name: Run Tests
-        run: ./gradlew check
-
-      # Collect Tests Result of failed tests
-      - name: Collect Tests Result
-        if: ${{ failure() }}
+      - name: Upload Test Results
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: tests-result
+          name: test-results
           path: ${{ github.workspace }}/build/reports/tests
 
-      # Upload the Kover report to CodeCov
-      - name: Upload Code Coverage Report
-        uses: codecov/codecov-action@v5
-        with:
-          files: ${{ github.workspace }}/build/reports/kover/report.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  # Run Qodana inspections and provide a report
-  inspectCode:
-    name: Inspect code
-    needs: [ build ]
+  # Qodana only runs on pull requests to save time on regular pushes
+  inspect-code:
+    name: Qodana
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       checks: write
       pull-requests: write
     steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      # Check out the current repository
       - name: Fetch Sources
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
-          fetch-depth: 0  # a full history is required for pull request analysis
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
-      # Set up the Java environment for the next steps
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: 21
 
-      # Run Qodana inspections
       - name: Qodana - Code Inspection
         uses: JetBrains/qodana-action@v2025.1.1
         with:
