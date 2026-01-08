@@ -79,7 +79,8 @@ jobs:
       - name: Update updatePlugins.xml
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          sed -i "s/version=\"[^\"]*\"/version=\"$VERSION\"/" updatePlugins.xml
+          # Only update the version in the <plugin> tag, not the XML declaration
+          sed -i "s/\(<plugin.*version=\"\)[^\"]*/\1$VERSION/" updatePlugins.xml
 
       - name: Build Plugin
         run: ./gradlew buildPlugin
