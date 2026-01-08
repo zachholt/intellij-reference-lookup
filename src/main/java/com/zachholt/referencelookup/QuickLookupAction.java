@@ -268,7 +268,7 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
                 desc = desc.substring(0, 47) + "...";
             }
             
-            return display + "  [Click to copy]";
+            return "Copy: " + (item.getValue() != null && !item.getValue().isEmpty() ? item.getValue() : item.getCode()) + " ← " + item.getCode();
         }
         
         @Override
