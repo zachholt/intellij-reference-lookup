@@ -7,18 +7,12 @@
     A fast and easy-to-use reference lookup tool for IntelliJ IDEA.<br/>
     <br/>
     Features:<br/>
-    - NEW: Reference Browser tool window with tree view by categories<br/>
+    - Reference Browser tool window with tree view by categories<br/>
     - Right-click on any selected text to look up references<br/>
-    - Quick access to top 10 matches directly in context menu<br/>
+    - Click to copy reference code to clipboard<br/>
     - Fuzzy search across all references<br/>
     - Support for large reference datasets<br/>
     - Keyboard shortcuts for fast access (Ctrl+Shift+L)<br/>
-    <br/>
-    Version 2.0.0 Changes:<br/>
-    - Added Reference Browser tool window to replace freezing popup<br/>
-    - Added category tree view for better organization<br/>
-    - Improved search performance and UI responsiveness<br/>
-    - Fixed context menu display issues<br/>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -35,11 +29,17 @@
                                displayName="Reference Lookup"/>
 
         <projectService serviceImplementation="com.zachholt.referencelookup.service.ReferenceDataService"/>
+        
         <!-- Reference Browser Tool Window -->
         <toolWindow id="ReferenceBrowser"
                     secondary="false"
                     anchor="right"
                     factoryClass="com.zachholt.referencelookup.ui.ReferenceToolWindowFactory"/>
+        
+        <!-- Notification Group for copy feedback -->
+        <notificationGroup id="Reference Lookup"
+                          displayType="BALLOON"
+                          key="notification.group.reference.lookup"/>
     </extensions>
 
     <actions>
@@ -58,15 +58,6 @@
                 text="Search All References..."
                 description="Open the reference search dialog">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift L"/>
-        </action>
-
-        <!-- Create SQL from Jira ticket action -->
-        <action id="com.zachholt.referencelookup.CreateSqlFromJira"
-                class="com.zachholt.referencelookup.action.CreateSqlFromJiraAction"
-                text="Create SQL from Jira Ticket"
-                description="Create a new SQL file with Jira ticket information as header comments">
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            <add-to-group group-id="NewGroup" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

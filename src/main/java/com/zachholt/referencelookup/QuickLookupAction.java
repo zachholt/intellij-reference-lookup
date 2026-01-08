@@ -1,5 +1,7 @@
 package com.zachholt.referencelookup;
 
+import com.intellij.notification.NotificationGroupManager;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
@@ -16,6 +18,8 @@ import com.zachholt.referencelookup.ui.ReferenceBrowserWithTreePanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -256,17 +260,35 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
             
             String display = item.getCode();
             if (item.getValue() != null && !item.getValue().isEmpty()) {
-                display += " (" + item.getValue() + ")";
+                display += " = " + item.getValue();
             }
             
-            return display + " → " + desc;
+            // Truncate description if too long
+            if (desc.length() > 50) {
+                desc = desc.substring(0, 47) + "...";
+            }
+            
+            return display + "  [Click to copy]";
         }
         
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
+            Project project = e.getProject();
+            
             // Copy the code to clipboard
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                    .setContents(new java.awt.datatransfer.StringSelection(item.getCode()), null);
+            String codeToCopy = item.getCode();
+            Toolkit.getDefaultToolkit().getSystemClipboard()
+                    .setContents(new StringSelection(codeToCopy), null);
+            
+            // Show notification
+            if (project != null) {
+                NotificationGroupManager.getInstance()
+                        .getNotificationGroup("Reference Lookup")
+                        .createNotification(
+                                "Copied: " + codeToCopy,
+                                NotificationType.INFORMATION)
+                        .notify(project);
+            }
         }
     }
 }
