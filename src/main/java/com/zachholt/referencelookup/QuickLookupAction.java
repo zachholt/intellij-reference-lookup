@@ -276,7 +276,7 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
             Project project = e.getProject();
             
             // Copy the code to clipboard
-            String codeToCopy = item.getCode();
+            String codeToCopy = item.getValue() != null && !item.getValue().isEmpty() ? item.getValue() : item.getCode();
             Toolkit.getDefaultToolkit().getSystemClipboard()
                     .setContents(new StringSelection(codeToCopy), null);
             
