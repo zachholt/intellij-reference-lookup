@@ -1,5 +1,6 @@
 package com.zachholt.referencelookup;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.notification.NotificationGroupManager;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.actionSystem.*;
@@ -25,15 +26,9 @@ import java.util.List;
 
 public class QuickLookupAction extends ActionGroup implements DumbAware {
 
-    // Cache for pre-computed search results to avoid EDT blocking
     private static final Key<CachedSearchResult> CACHED_RESULT_KEY = Key.create("QuickLookupAction.CachedResult");
-
-    // Cache validity period (5 seconds)
     private static final long CACHE_VALIDITY_MS = 5000;
 
-    /**
-     * Holds cached search results with query and timestamp for validation.
-     */
     private static class CachedSearchResult {
         final String query;
         final List<ReferenceItem> results;
@@ -67,9 +62,6 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
             String selectedText = editor.getSelectionModel().getSelectedText();
             if (selectedText != null && selectedText.trim().length() <= 50) {
                 e.getPresentation().setText("Lookup '" + selectedText.trim() + "'");
-
-                // Pre-compute search results in background during update()
-                // This keeps the cache warm so getChildren() doesn't block
                 precomputeSearchResults(project, selectedText.trim());
             } else {
                 e.getPresentation().setText("Reference Lookup");
@@ -77,10 +69,6 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         }
     }
 
-    /**
-     * Pre-computes search results on a background thread and stores in project cache.
-     * Called from update() to keep the cache warm before getChildren() is invoked.
-     */
     private void precomputeSearchResults(Project project, String query) {
         ReferenceDataService service = ReferenceDataService.getInstance(project);
         if (!service.isLoaded()) {
@@ -90,16 +78,12 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
 
         CachedSearchResult cached = project.getUserData(CACHED_RESULT_KEY);
         if (cached != null && cached.isValid(query)) {
-            return; // Already have valid cached results
+            return;
         }
 
-        // Run search in background thread
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             if (project.isDisposed()) return;
-
             List<ReferenceItem> results = service.search(query, 11);
-
-            // Store in project-level cache (thread-safe via Key mechanism)
             project.putUserData(CACHED_RESULT_KEY, new CachedSearchResult(query, results));
         });
     }
@@ -130,22 +114,23 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
             return actions.toArray(new AnAction[0]);
         }
 
-        // Use cached results - NO blocking search on EDT!
         CachedSearchResult cached = project.getUserData(CACHED_RESULT_KEY);
         List<ReferenceItem> matches;
 
         if (cached != null && cached.isValid(query)) {
             matches = cached.results;
         } else {
-            // Cache miss - show "Searching..." and trigger background search
             precomputeSearchResults(project, query);
             actions.add(createDisabledAction("Searching..."));
             actions.add(createOpenBrowserAction(query));
             return actions.toArray(new AnAction[0]);
         }
         
-        // Build menu from cached results (fast, no blocking)
         if (!matches.isEmpty()) {
+            // Add header with clipboard icon
+            actions.add(createCopyHeader());
+            actions.add(Separator.getInstance());
+            
             int count = Math.min(matches.size(), 5);
             for (int i = 0; i < count; i++) {
                 actions.add(new QuickValueAction(matches.get(i)));
@@ -167,15 +152,25 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         return actions.toArray(new AnAction[0]);
     }
 
-    /**
-     * Creates a disabled action with the given text.
-     */
+    private AnAction createCopyHeader() {
+        AnAction action = new AnAction("Click to copy value", null, AllIcons.Actions.Copy) {
+            @Override
+            public void actionPerformed(@NotNull AnActionEvent e) {
+                // Do nothing - this is just a header
+            }
+
+            @Override
+            public void update(@NotNull AnActionEvent e) {
+                e.getPresentation().setEnabled(false);
+            }
+        };
+        return action;
+    }
+
     private AnAction createDisabledAction(String text) {
         return new AnAction(text) {
             @Override
-            public void actionPerformed(@NotNull AnActionEvent e) {
-                // Do nothing
-            }
+            public void actionPerformed(@NotNull AnActionEvent e) {}
 
             @Override
             public void update(@NotNull AnActionEvent e) {
@@ -184,18 +179,12 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         };
     }
 
-    /**
-     * Creates an action to open the Reference Browser tool window.
-     */
     private AnAction createOpenBrowserAction() {
         return createOpenBrowserAction(null);
     }
 
-    /**
-     * Creates an action to open the Reference Browser tool window with optional search text.
-     */
     private AnAction createOpenBrowserAction(String searchText) {
-        return new AnAction("Open Reference Browser") {
+        return new AnAction("Open Reference Browser", null, AllIcons.Actions.Search) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 openToolWindowWithSelection(e, searchText);
@@ -203,11 +192,8 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         };
     }
 
-    /**
-     * Creates an action showing "... and N more" that opens the browser.
-     */
     private AnAction createMoreResultsAction(int moreCount, String searchText) {
-        return new AnAction("... and " + moreCount + " more (Open Reference Browser)") {
+        return new AnAction("... and " + moreCount + " more") {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 openToolWindowWithSelection(e, searchText);
@@ -217,9 +203,7 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
 
     private void openToolWindowWithSelection(AnActionEvent e, String selection) {
         Project project = e.getProject();
-        if (project == null) {
-            return;
-        }
+        if (project == null) return;
 
         ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ReferenceBrowser");
         if (toolWindow != null) {
@@ -243,50 +227,35 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         private final ReferenceItem item;
         
         QuickValueAction(ReferenceItem item) {
-            super(formatMenuItem(item));
+            super(formatMenuItem(item), item.getDescription(), AllIcons.Actions.Copy);
             this.item = item;
-            
-            // Set tooltip to show full description
-            String tooltip = item.getCode() + "\n" + 
-                           (item.getDescription() != null ? item.getDescription() : "No description");
-            getTemplatePresentation().setDescription(tooltip);
         }
         
         private static String formatMenuItem(ReferenceItem item) {
-            String desc = item.getDescription();
-            if (desc == null) {
-                desc = "No description";
-            }
+            String value = item.getValue();
+            String code = item.getCode();
             
-            String display = item.getCode();
-            if (item.getValue() != null && !item.getValue().isEmpty()) {
-                display += " = " + item.getValue();
+            if (value != null && !value.isEmpty()) {
+                return value + "  ←  " + code;
             }
-            
-            // Truncate description if too long
-            if (desc.length() > 50) {
-                desc = desc.substring(0, 47) + "...";
-            }
-            
-            return "Copy: " + (item.getValue() != null && !item.getValue().isEmpty() ? item.getValue() : item.getCode()) + " ← " + item.getCode();
+            return code;
         }
         
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
             Project project = e.getProject();
             
-            // Copy the code to clipboard
-            String codeToCopy = item.getValue() != null && !item.getValue().isEmpty() ? item.getValue() : item.getCode();
-            Toolkit.getDefaultToolkit().getSystemClipboard()
-                    .setContents(new StringSelection(codeToCopy), null);
+            String valueToCopy = item.getValue() != null && !item.getValue().isEmpty() 
+                    ? item.getValue() 
+                    : item.getCode();
             
-            // Show notification
+            Toolkit.getDefaultToolkit().getSystemClipboard()
+                    .setContents(new StringSelection(valueToCopy), null);
+            
             if (project != null) {
                 NotificationGroupManager.getInstance()
                         .getNotificationGroup("Reference Lookup")
-                        .createNotification(
-                                "Copied: " + codeToCopy,
-                                NotificationType.INFORMATION)
+                        .createNotification("Copied: " + valueToCopy, NotificationType.INFORMATION)
                         .notify(project);
             }
         }
