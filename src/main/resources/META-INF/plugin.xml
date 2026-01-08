@@ -59,5 +59,14 @@
                 description="Open the reference search dialog">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift L"/>
         </action>
+
+        <!-- Create SQL from Jira ticket action -->
+        <action id="com.zachholt.referencelookup.CreateSqlFromJira"
+                class="com.zachholt.referencelookup.action.CreateSqlFromJiraAction"
+                text="Create SQL from Jira Ticket"
+                description="Create a new SQL file with Jira ticket information as header comments">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="NewGroup" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>

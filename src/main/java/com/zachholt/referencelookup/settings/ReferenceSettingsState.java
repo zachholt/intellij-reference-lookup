@@ -16,6 +16,11 @@ public class ReferenceSettingsState implements PersistentStateComponent<Referenc
 
     public String referenceFilePath = "";
 
+    // Jira settings
+    public String jiraBaseUrl = "";
+    public String jiraEmail = "";
+    public String jiraApiToken = "";
+
     public static ReferenceSettingsState getInstance() {
         return ApplicationManager.getApplication().getService(ReferenceSettingsState.class);
     }
