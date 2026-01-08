@@ -236,7 +236,7 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
             String code = item.getCode();
             
             if (value != null && !value.isEmpty()) {
-                return value + "  ←  " + code;
+                return code + " (" + value + ")";
             }
             return code;
         }
