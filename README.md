@@ -12,6 +12,22 @@ Features:
 
 ## Installation
 
+### From Custom Plugin Repository (Recommended for Auto-Updates)
+
+Add the GitHub repository as a custom plugin source for automatic updates:
+
+1. Open IntelliJ IDEA
+2. Go to **Settings/Preferences** > **Plugins**
+3. Click the **⚙️ gear icon** > **Manage Plugin Repositories...**
+4. Click **+** and add:
+   ```
+   https://raw.githubusercontent.com/zachholt/intellij-reference-lookup/main/updatePlugins.xml
+   ```
+5. Click **OK**, then go to the **Marketplace** tab
+6. Search for "Reference Lookup" and click **Install**
+
+The plugin will now auto-update when new versions are released.
+
 ### From JetBrains Marketplace
 
 1. Open IntelliJ IDEA
@@ -147,25 +163,30 @@ intellij.localPath=/Applications/IntelliJ IDEA CE.app
 
 ### Creating a Release
 
-1. Update `pluginVersion` in `gradle.properties`
-2. Update `CHANGELOG.md` with release notes under a `## [X.Y.Z]` heading
-3. Commit and push to `main`
-4. Go to **Actions** > **Trigger Release** workflow
-5. Enter the version number and run the workflow
+Releases are fully automated. Just run the workflow:
 
-The workflow will:
-- Validate the version matches `gradle.properties`
-- Build the plugin
-- Create a GitHub release with the plugin `.zip` attached
-- Publish to JetBrains Marketplace (if secrets are configured)
+1. Go to **Actions** > **Trigger Release**
+2. Select the version bump type:
+   - **patch** (1.2.3 → 1.2.4) - Bug fixes
+   - **minor** (1.2.3 → 1.3.0) - New features
+   - **major** (1.2.3 → 2.0.0) - Breaking changes
+3. Click **Run workflow**
+
+The workflow automatically:
+- Calculates the new version number
+- Updates `gradle.properties`, `CHANGELOG.md`, and `updatePlugins.xml`
+- Builds the plugin
+- Creates a Git tag and GitHub release
+- Attaches the plugin `.zip` to the release
+- Commits version updates back to `main`
 
 ### GitHub Actions Workflows
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| **Build** | Push to `main`, PRs | Builds, tests, and creates draft release |
+| **Build** | Push to `main`, PRs | Builds, tests, and runs code inspection |
 | **Release** | GitHub Release published | Publishes to JetBrains Marketplace |
-| **Trigger Release** | Manual | Creates a tagged release with artifact |
+| **Trigger Release** | Manual | Auto-bumps version and creates release |
 
 ## Project Structure
 

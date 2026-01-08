@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+    <plugin id="com.zachholt.reference-lookup"
+            url="https://github.com/zachholt/intellij-reference-lookup/releases/latest/download/reference-lookup.zip"
+            version="2.5.2">
+        <idea-version since-build="241"/>
+        <name>Reference Lookup</name>
+        <description>A fast and easy-to-use reference lookup tool for IntelliJ IDEA</description>
+        <vendor>Zach Holt</vendor>
+    </plugin>
+</plugins>
