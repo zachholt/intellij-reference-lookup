@@ -28,13 +28,6 @@ Add the GitHub repository as a custom plugin source for automatic updates:
 
 The plugin will now auto-update when new versions are released.
 
-### From JetBrains Marketplace
-
-1. Open IntelliJ IDEA
-2. Go to **Settings/Preferences** > **Plugins** > **Marketplace**
-3. Search for "Reference Lookup"
-4. Click **Install**
-
 ### Manual Installation
 
 1. Download the latest release `.zip` file from [GitHub Releases](https://github.com/zachholt/intellij-reference-lookup/releases)
@@ -185,7 +178,6 @@ The workflow automatically:
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
 | **Build** | Push to `main`, PRs | Builds, tests, and runs code inspection |
-| **Release** | GitHub Release published | Publishes to JetBrains Marketplace |
 | **Trigger Release** | Manual | Auto-bumps version and creates release |
 
 ## Project Structure
