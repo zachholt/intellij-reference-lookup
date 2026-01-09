@@ -227,14 +227,31 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         private final ReferenceItem item;
         
         QuickValueAction(ReferenceItem item) {
-            super(formatMenuItem(item), item.getDescription(), AllIcons.Actions.Copy);
+            super(formatMenuItem(item), formatTooltip(item), AllIcons.Actions.Copy);
             this.item = item;
+        }
+
+        private static String formatTooltip(ReferenceItem item) {
+            // Show code and value in tooltip for reference
+            String code = item.getCode();
+            String value = item.getValue();
+            if (value != null && !value.isEmpty()) {
+                return code + " = " + value;
+            }
+            return code;
         }
         
         private static String formatMenuItem(ReferenceItem item) {
+            String description = item.getDescription();
             String value = item.getValue();
+
+            // Show description from Javadoc comment (more readable than variable name)
+            if (description != null && !description.isEmpty()) {
+                return description;
+            }
+
+            // Fallback to code + value if no description
             String code = item.getCode();
-            
             if (value != null && !value.isEmpty()) {
                 return code + " (" + value + ")";
             }
