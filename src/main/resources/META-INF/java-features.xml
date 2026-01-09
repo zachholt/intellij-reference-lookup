@@ -1,0 +1,4 @@
+<idea-plugin>
+    <!-- This file is loaded only when Java plugin is available -->
+    <!-- PSI-based parsing is enabled automatically when Java is present -->
+</idea-plugin>

@@ -4,7 +4,9 @@
     <vendor email="zachholt@example.com" url="https://github.com/zachholt">Zach Holt</vendor>
 
     <description><![CDATA[
-    A fast and easy-to-use reference lookup tool for IntelliJ IDEA.<br/>
+    A fast and easy-to-use reference lookup tool for JetBrains IDEs.<br/>
+    <br/>
+    Works in: IntelliJ IDEA, DataGrip, PyCharm, WebStorm, and other JetBrains IDEs.<br/>
     <br/>
     Features:<br/>
     - Reference Browser tool window with tree view by categories<br/>
@@ -16,7 +18,8 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.java</depends>
+    <!-- Java is optional - enables PSI parsing when available -->
+    <depends optional="true" config-file="java-features.xml">com.intellij.modules.java</depends>
     
     <resource-bundle>messages.ReferenceBundle</resource-bundle>
 

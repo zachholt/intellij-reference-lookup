@@ -4,13 +4,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.LocalFileSystem;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.zachholt.referencelookup.model.ReferenceItem;
 import com.zachholt.referencelookup.parser.JavaConstantParser;
-import com.zachholt.referencelookup.parser.PsiConstantParser;
 import com.zachholt.referencelookup.settings.ReferenceSettingsState;
 
 import java.nio.file.Files;
@@ -30,8 +25,10 @@ import java.util.regex.Pattern;
 public final class ReferenceDataService {
     private static final Logger LOG = Logger.getInstance(ReferenceDataService.class);
 
-    // Pre-compiled pattern for code splitting
     private static final Pattern CODE_SPLIT_PATTERN = Pattern.compile("[\\s_-]");
+    
+    // Check once if Java plugin is available
+    private static final boolean JAVA_AVAILABLE = isJavaPluginAvailable();
 
     private final List<ReferenceItem> references = new ArrayList<>();
     private final Map<String, List<ReferenceItem>> codeIndex = new HashMap<>();
@@ -46,6 +43,15 @@ public final class ReferenceDataService {
     public ReferenceDataService(Project project) {
         this.project = project;
     }
+    
+    private static boolean isJavaPluginAvailable() {
+        try {
+            Class.forName("com.intellij.psi.PsiJavaFile");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 
     public static ReferenceDataService getInstance(Project project) {
         return project.getService(ReferenceDataService.class);
@@ -57,11 +63,6 @@ public final class ReferenceDataService {
         loadReferencesAsync();
     }
 
-    /**
-     * Loads references asynchronously in the background.
-     * This method is thread-safe and ensures references are loaded only once.
-     * Use onLoaded() to be notified when loading completes.
-     */
     public void loadReferencesAsync() {
         if (isLoaded) return;
 
@@ -73,7 +74,7 @@ public final class ReferenceDataService {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             long startTime = System.currentTimeMillis();
             try {
-                LOG.info("Starting background load of references...");
+                LOG.info("Starting background load of references... (Java available: " + JAVA_AVAILABLE + ")");
 
                 List<ReferenceItem> loadedItems = new ArrayList<>();
                 ReferenceSettingsState settings = ReferenceSettingsState.getInstance();
@@ -81,7 +82,7 @@ public final class ReferenceDataService {
                 if (settings.referenceFilePath != null && !settings.referenceFilePath.isEmpty()) {
                     Path javaPath = Paths.get(settings.referenceFilePath);
                     if (Files.exists(javaPath)) {
-                        LOG.info("Loading references from Java: " + javaPath);
+                        LOG.info("Loading references from: " + javaPath);
                         loadedItems.addAll(loadFromJavaFile(javaPath));
                     } else {
                         LOG.warn("Reference file not found: " + javaPath);
@@ -113,10 +114,6 @@ public final class ReferenceDataService {
         });
     }
 
-    /**
-     * Register a callback to be notified when references finish loading.
-     * If already loaded, the callback runs immediately.
-     */
     public void onLoaded(Runnable callback) {
         if (isLoaded) {
             callback.run();
@@ -147,34 +144,22 @@ public final class ReferenceDataService {
     }
 
     private List<ReferenceItem> loadFromJavaFile(Path path) {
-        try {
-            // Try PSI parsing first (much more robust)
-            final List<ReferenceItem> items = new ArrayList<>();
-
-            ApplicationManager.getApplication().runReadAction(() -> {
-                VirtualFile virtualFile = LocalFileSystem.getInstance().findFileByNioFile(path);
-                if (virtualFile != null) {
-                    if (project.isDisposed()) return;
-
-                    PsiFile psiFile = PsiManager.getInstance(project).findFile(virtualFile);
-                    if (psiFile != null) {
-                        PsiConstantParser parser = new PsiConstantParser();
-                        items.addAll(parser.parse(psiFile));
-                    }
+        // Try PSI parsing first if Java plugin is available
+        if (JAVA_AVAILABLE) {
+            try {
+                List<ReferenceItem> items = loadWithPsiParser(path);
+                if (!items.isEmpty()) {
+                    LOG.info("Successfully parsed via PSI: " + path);
+                    return items;
                 }
-            });
-
-            if (!items.isEmpty()) {
-                LOG.info("Successfully parsed via PSI: " + path);
-                return items;
+            } catch (Exception e) {
+                LOG.warn("Failed to parse Java file via PSI: " + path, e);
             }
-        } catch (Exception e) {
-            LOG.warn("Failed to parse Java file via PSI: " + path, e);
         }
 
-        // Fallback to regex parser
+        // Fallback to regex parser (works in all IDEs)
         try {
-            LOG.info("Falling back to Regex parser for: " + path);
+            LOG.info("Using regex parser for: " + path);
             JavaConstantParser parser = new JavaConstantParser();
             List<ReferenceItem> loaded = parser.parseJavaFile(path);
             if (loaded != null) {
@@ -184,6 +169,12 @@ public final class ReferenceDataService {
             LOG.warn("Failed to parse Java file: " + path, e);
         }
         return Collections.emptyList();
+    }
+    
+    private List<ReferenceItem> loadWithPsiParser(Path path) {
+        // This method is only called when JAVA_AVAILABLE is true
+        // Use a separate helper class to avoid loading PSI classes when Java isn't available
+        return PsiParserHelper.parse(project, path);
     }
 
     private void buildIndex() {
@@ -232,7 +223,6 @@ public final class ReferenceDataService {
             String normalizedQuery = query.toLowerCase().trim();
             Set<ReferenceItem> results = new LinkedHashSet<>();
 
-            // 1. Exact match (fastest)
             List<ReferenceItem> exactMatches = codeIndex.get(normalizedQuery);
             if (exactMatches != null) {
                 results.addAll(exactMatches);
@@ -242,7 +232,6 @@ public final class ReferenceDataService {
                 return new ArrayList<>(results).subList(0, limit);
             }
 
-            // 2. Contains match
             for (ReferenceItem item : references) {
                 String codeLower = item.getCodeLower();
                 String descriptionLower = item.getDescriptionLower();
@@ -260,7 +249,6 @@ public final class ReferenceDataService {
                 return new ArrayList<>(results);
             }
 
-            // 3. Fuzzy match (only if no results yet)
             if (results.isEmpty()) {
                 for (ReferenceItem item : references) {
                     String codeLower = item.getCodeLower();
