@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.zachholt.reference-lookup</id>
     <name>Reference Lookup</name>
-    <vendor email="zachholt@example.com" url="https://github.com/zachholt">Zach Holt</vendor>
+    <vendor url="https://github.com/zachholt">Zach Holt</vendor>
 
     <description><![CDATA[
     A fast and easy-to-use reference lookup tool for JetBrains IDEs.<br/>

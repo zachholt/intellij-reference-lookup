@@ -125,6 +125,7 @@ public class PsiConstantParser {
     
             references.add(new ReferenceItem(
                 name,
+                value,
                 description,
                 extractCategory(name),
                 extractTags(name, description)

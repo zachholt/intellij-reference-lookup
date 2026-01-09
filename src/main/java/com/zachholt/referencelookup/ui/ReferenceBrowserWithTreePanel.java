@@ -22,6 +22,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
@@ -315,11 +316,11 @@ public class ReferenceBrowserWithTreePanel extends SimpleToolWindowPanel impleme
 
     private void insertSelectedReference(ReferenceItem item) {
         if (item != null) {
-            // TODO: Insert into editor
-            JOptionPane.showMessageDialog(this,
-                "Would insert: " + item.getCode(),
-                "Reference",
-                JOptionPane.INFORMATION_MESSAGE);
+            String textToCopy = item.getValue() != null && !item.getValue().isEmpty()
+                ? item.getValue()
+                : item.getCode();
+            StringSelection selection = new StringSelection(textToCopy);
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
         }
     }
 

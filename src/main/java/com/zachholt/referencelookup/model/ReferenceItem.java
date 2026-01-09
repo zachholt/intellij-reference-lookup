@@ -9,8 +9,7 @@ public class ReferenceItem {
     private String category;
     private List<String> tags;
 
-    // Transient cached lowercase values for efficient searching
-    // Not serialized by Gson, lazily initialized on first access
+    // Cached lowercase values for efficient searching (lazily initialized)
     private transient String codeLower;
     private transient String descriptionLower;
     private transient String valueLower;
