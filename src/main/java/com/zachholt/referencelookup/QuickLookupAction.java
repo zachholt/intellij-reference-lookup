@@ -261,14 +261,19 @@ public class QuickLookupAction extends ActionGroup implements DumbAware {
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {
             Project project = e.getProject();
-            
-            String valueToCopy = item.getValue() != null && !item.getValue().isEmpty() 
-                    ? item.getValue() 
-                    : item.getCode();
-            
+
+            // Copy description (same as what's shown in the menu)
+            String valueToCopy = item.getDescription();
+            if (valueToCopy == null || valueToCopy.isEmpty()) {
+                // Fallback to value or code
+                valueToCopy = item.getValue() != null && !item.getValue().isEmpty()
+                        ? item.getValue()
+                        : item.getCode();
+            }
+
             Toolkit.getDefaultToolkit().getSystemClipboard()
                     .setContents(new StringSelection(valueToCopy), null);
-            
+
             if (project != null) {
                 NotificationGroupManager.getInstance()
                         .getNotificationGroup("Reference Lookup")
