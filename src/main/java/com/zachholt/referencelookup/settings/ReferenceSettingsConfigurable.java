@@ -20,13 +20,14 @@ public class ReferenceSettingsConfigurable implements Configurable {
         return "Reference Lookup";
     }
 
+    @SuppressWarnings("removal")
     @Override
     public @Nullable JComponent createComponent() {
         javaFileField.addBrowseFolderListener(
+            "Select Java Reference File",
+            "Choose the Java file containing reference constants",
             null,
             FileChooserDescriptorFactory.createSingleFileDescriptor("java")
-                .withTitle("Select Java Reference File")
-                .withDescription("Choose the Java file containing reference constants")
         );
 
         mainPanel = FormBuilder.createFormBuilder()
